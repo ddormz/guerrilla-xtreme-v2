@@ -49,8 +49,12 @@
                     <p>{{ event.time }}</p>
                   </div>
                   <div v-if="event.prizes" class="event-block col-span-2">
-                    <span class="k text-amber-500">Premios</span>
-                    <p class="font-bold">{{ event.prizes }}</p>
+                    <span class="k text-amber-500">🏆 Premios</span>
+                    <ul class="prize-list mt-xs">
+                      <li v-for="(p, i) in event.prizes.split('\n')" :key="i" class="text-xs font-bold flex items-center gap-xs">
+                        <span class="text-amber-500">•</span> {{ p }}
+                      </li>
+                    </ul>
                   </div>
                   <div class="event-block col-span-2">
                     <span class="k text-green-500">Costo Inscripción</span>
@@ -73,7 +77,7 @@
               <h3 class="section-title">¿Tienes cuenta en R.E.X?</h3>
               <p class="text-secondary mb-md italic text-sm">
                 REX es nuestra plataforma oficial de gestión de batallas y bladers. 
-                <a href="https://royal-evolution-x.cl/dashboard" target="_blank" class="text-gx-red font-bold hover:underline ml-1">Ir a R.E.X →</a>
+                <button type="button" @click="showRexModal = true" class="text-gx-red font-bold hover:underline ml-1">¿Qué es R.E.X? →</button>
               </p>
               
               <div class="rex-options mb-lg">
@@ -190,7 +194,11 @@
                     <p class="payment-value">{{ event.account_holder || 'Daniel Orellana' }}</p>
                   </div>
                   <div class="payment-row">
-                    <span class="payment-label">Cuenta</span>
+                    <span class="payment-label">Tipo</span>
+                    <p class="payment-value uppercase">{{ event.account_type || 'Cuenta Vista / Rut' }}</p>
+                  </div>
+                  <div class="payment-row">
+                    <span class="payment-label">N° Cuenta</span>
                     <p class="payment-value">{{ event.account_number || '20539169' }}</p>
                   </div>
                   <div class="payment-row">
@@ -243,6 +251,38 @@
         </div>
       </div>
     </div>
+
+    <!-- REX Explanation Modal -->
+    <div v-if="showRexModal" class="modal-overlay" @click.self="showRexModal = false">
+      <div class="modal-content card max-w-md p-xl border-gx-red/20">
+        <div class="text-center mb-lg">
+          <div class="text-4xl mb-md">🛡️</div>
+          <h2 class="text-xl font-black text-gradient uppercase">¿Qué es R.E.X?</h2>
+        </div>
+        
+        <div class="space-y-md text-sm leading-relaxed">
+          <p>
+            <strong>Royal Evolution X (R.E.X)</strong> es el sistema avanzado de gestión de torneos que utilizamos en nuestra liga.
+          </p>
+          <p>
+            Es un estándar en la escena competitiva, utilizado también por comunidades como <strong>Street Bey (The Mechanic)</strong> y la <strong>CCB (Comunidad Chilena de Beyblade)</strong>.
+          </p>
+          <p class="p-md bg-white/5 border-l-4 border-gx-red rounded-r-lg">
+            A través de REX podrás ver tu grupo asignado, seguir el progreso de las brackets en tiempo real e incluso reportar tus victorias directamente desde tu celular.
+          </p>
+          
+          <div class="pt-md">
+            <p class="text-[10px] text-secondary uppercase font-bold mb-xs">Enlace Oficial Visible:</p>
+            <div class="flex items-center gap-sm p-sm bg-black/40 rounded border border-white/5">
+              <span class="text-xs truncate text-gx-red">https://royal-evolution-x.cl</span>
+              <a href="https://royal-evolution-x.cl" target="_blank" class="btn btn-outline btn-xs ml-auto">Abrir</a>
+            </div>
+          </div>
+        </div>
+        
+        <button @click="showRexModal = false" class="btn btn-primary btn-block mt-xl">Entendido, Volver al registro</button>
+      </div>
+    </div>
   </AppLayout>
 </template>
 
@@ -264,6 +304,7 @@ const stepTitles = ['Evento', 'R.E.X?', 'Blader', 'Contacto', 'Pago'];
 const currentStep = ref(1);
 const isRex = computed(() => form.is_rex_registered === true);
 const proofInput = ref(null);
+const showRexModal = ref(false);
 
 const form = useForm({
   first_name: '',

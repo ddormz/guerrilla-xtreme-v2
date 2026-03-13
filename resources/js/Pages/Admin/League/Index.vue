@@ -181,8 +181,16 @@
             </div>
 
             <div class="form-group mb-md">
-              <label class="form-label">Premios</label>
-              <textarea v-model="eventForm.prizes" class="form-input" rows="2" placeholder="Describe los premios..."></textarea>
+              <label class="form-label flex justify-between items-center">
+                Premios
+                <button type="button" @click="addPrizeRow" class="text-accent-green text-[10px] font-black uppercase hover:underline">+ Añadir Premio</button>
+              </label>
+              <div class="space-y-xs">
+                <div v-for="(prize, index) in eventForm.prizes_list" :key="index" class="flex gap-xs">
+                  <input type="text" v-model="eventForm.prizes_list[index]" class="form-input form-input-sm" placeholder="Ej: 1er Lugar - Trofeo" />
+                  <button type="button" @click="removePrizeRow(index)" class="btn btn-ghost btn-xs text-gx-red">×</button>
+                </div>
+              </div>
             </div>
 
             <div class="divider mb-md">Datos Bancarios (Para Torneos)</div>
@@ -200,13 +208,18 @@
 
             <div class="grid grid-cols-2 gap-md mb-md">
               <div class="form-group">
+                <label class="form-label">Tipo de Cuenta</label>
+                <input type="text" v-model="eventForm.account_type" class="form-input" placeholder="Corriente / Vista" />
+              </div>
+              <div class="form-group">
                 <label class="form-label">N° Cuenta</label>
                 <input type="text" v-model="eventForm.account_number" class="form-input" />
               </div>
-              <div class="form-group">
-                <label class="form-label">Email de Pago</label>
-                <input type="email" v-model="eventForm.account_email" class="form-input" />
-              </div>
+            </div>
+
+            <div class="form-group mb-md">
+              <label class="form-label">Email de Pago</label>
+              <input type="email" v-model="eventForm.account_email" class="form-input" />
             </div>
 
             <div class="form-group mb-md">
@@ -316,10 +329,12 @@ const eventForm = useForm({
   prizes: '',
   registration_cost: 0,
   bank_name: '',
+  account_type: '',
   account_holder: '',
   account_number: '',
   account_email: '',
   payment_instructions: '',
+  prizes_list: [''], // For dynamic UI
   show_on_index: false,
   _method: 'POST',
 });
@@ -345,6 +360,7 @@ const openModal = (type) => {
     eventForm.reset();
     eventForm.season_id = props.seasons[0]?.id || '';
     eventForm.event_type = 'liga';
+    eventForm.prizes_list = [''];
     eventForm._method = 'POST';
   }
   activeModal.value = type;
@@ -367,10 +383,12 @@ const editEvent = (event) => {
   eventForm.prizes = event.prizes || '';
   eventForm.registration_cost = event.registration_cost || 0;
   eventForm.bank_name = event.bank_name || '';
+  eventForm.account_type = event.account_type || '';
   eventForm.account_holder = event.account_holder || '';
   eventForm.account_number = event.account_number || '';
   eventForm.account_email = event.account_email || '';
   eventForm.payment_instructions = event.payment_instructions || '';
+  eventForm.prizes_list = event.prizes ? event.prizes.split('\n') : [''];
   eventForm.show_on_index = !!event.show_on_index;
   eventForm._method = 'PUT';
   activeModal.value = 'event';
@@ -454,7 +472,19 @@ const deletePlayer = async (id) => {
 };
 
 const submitSeason = () => seasonForm.post(route('admin.seasons.store'), { onSuccess: () => (activeModal.value = null) });
+const addPrizeRow = () => eventForm.prizes_list.push('');
+const removePrizeRow = (index) => {
+  if (eventForm.prizes_list.length > 1) {
+    eventForm.prizes_list.splice(index, 1);
+  } else {
+    eventForm.prizes_list[0] = '';
+  }
+};
+
 const submitEvent = () => {
+  // Sync prizes_list to prizes string
+  eventForm.prizes = eventForm.prizes_list.filter(p => p.trim() !== '').join('\n');
+
   if (editingEvent.value) {
     eventForm.post(route('admin.events.update', editingEvent.value.id), { onSuccess: () => (activeModal.value = null) });
   } else {

@@ -25,6 +25,7 @@ class LeagueEvent extends Model
         'matches_locked',
         'flyer_image_path',
         'bank_name',
+        'account_type',
         'account_holder',
         'account_number',
         'account_email',

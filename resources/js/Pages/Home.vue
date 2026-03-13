@@ -23,7 +23,7 @@
 
           <div class="hero-actions mobile-hero-actions">
             <a href="#roster" class="btn btn-primary btn-lg">Conoce al Equipo</a>
-            <Link href="/liga" class="btn btn-outline btn-lg">Ver Clasificación</Link>
+            <Link v-if="$page.props.auth?.user?.role === 'miembro_gx' || $page.props.auth?.user?.role === 'admin'" href="/liga" class="btn btn-outline btn-lg">Ver Clasificación</Link>
           </div>
         </div>
       </section>

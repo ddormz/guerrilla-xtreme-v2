@@ -155,7 +155,7 @@ class LeagueController extends Controller
             'email' => 'required|email|max:255',
             'is_rex_registered' => 'required|boolean',
             'payment_option' => 'required|string|in:now,later',
-            'proof' => 'required_if:payment_option,now|image|max:5120', // Max 5MB
+            'proof' => $request->payment_option === 'now' ? 'required|image|max:5120' : 'nullable',
         ]);
 
         // Duplicate prevention

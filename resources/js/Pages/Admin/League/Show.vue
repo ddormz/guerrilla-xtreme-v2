@@ -132,38 +132,50 @@
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-4 gap-xl">
         <div class="lg:col-span-1 space-y-xl">
-          <section class="card p-lg border-accent-green/20 bg-accent-green/5">
+          <section class="card p-lg border-white/5 overflow-hidden">
             <div class="flex justify-between items-center mb-md">
-              <h2 class="text-sm font-black">Asistencia y pagos</h2>
-              <button type="button" class="btn btn-primary btn-xs" @click="saveAttendance" :disabled="attendanceForm.processing">Guardar</button>
+              <div>
+                <h2 class="text-sm font-black text-white">Asistencia y Pagos</h2>
+                <p class="text-[10px] text-secondary uppercase tracking-widest">Control presencial del día del evento</p>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" @click="saveAttendance" :disabled="attendanceForm.processing">
+                {{ attendanceForm.processing ? 'Guardando...' : '💾 Guardar Cambios' }}
+              </button>
             </div>
 
-            <div class="attendance-grid">
-              <article
-                v-for="entry in attendanceForm.entries"
-                :key="entry.player_id"
-                class="attendance-card"
-                :class="{ present: entry.present, paid: entry.paid && entry.present }"
-              >
-                <div class="attendance-head">
-                  <div class="flex items-center gap-sm">
-                    <div class="mini-avatar">
-                      <img v-if="playerAvatar(entry.player_id)" :src="playerAvatar(entry.player_id)" class="avatar-img" @error="handleImageError">
-                      <span v-else>{{ (entry.blader_name || '?').charAt(0) }}</span>
-                    </div>
-                    <strong>{{ entry.blader_name }}</strong>
-                  </div>
-                  <span class="text-xs text-secondary">#{{ entry.player_id }}</span>
-                </div>
-                <div class="attendance-actions">
-                  <button type="button" class="mini-btn" :class="entry.present ? 'on' : ''" @click="togglePresent(entry)">
-                    {{ entry.present ? 'Asistió ✓' : 'No asistió' }}
-                  </button>
-                  <button type="button" class="mini-btn" :class="entry.paid ? 'paid-on' : ''" :disabled="!entry.present" @click="entry.paid = !entry.paid">
-                    {{ entry.paid ? 'Pagó ✓' : 'Sin pago' }}
-                  </button>
-                </div>
-              </article>
+            <div class="overflow-x-auto mx-[-var(--space-lg)]">
+              <table class="gx-table attendance-table">
+                <thead>
+                  <tr>
+                    <th>Blader</th>
+                    <th class="text-center">Asistencia</th>
+                    <th class="text-center">Pago</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="entry in attendanceForm.entries" :key="entry.player_id" class="table-row" :class="{ 'inactive-row': !entry.present }">
+                    <td>
+                      <div class="flex items-center gap-sm">
+                        <div class="mini-avatar-text">{{ entry.blader_name.charAt(0) }}</div>
+                        <div>
+                          <span class="font-bold text-sm block leading-tight">{{ entry.blader_name }}</span>
+                          <span class="text-[9px] text-secondary uppercase">ID #{{ entry.player_id }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <button type="button" class="attendance-btn" :class="{ 'active': entry.present }" @click="togglePresent(entry)">
+                        {{ entry.present ? 'PRESENTE' : 'AUSENTE' }}
+                      </button>
+                    </td>
+                    <td class="text-center">
+                      <button type="button" class="payment-btn" :class="{ 'active': entry.paid, 'disabled': !entry.present }" :disabled="!entry.present" @click="entry.paid = !entry.paid">
+                        {{ entry.paid ? 'PAGADO' : 'PENDIENTE' }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </section>
         </div>
@@ -872,67 +884,51 @@ const handleImageError = (e) => {
   color: var(--text-secondary);
 }
 
-.attendance-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--space-md);
-  max-height: 480px;
-  overflow-y: auto;
-  padding-right: var(--space-sm);
+/* New Attendance Table Styles */
+.attendance-table th, .attendance-table td {
+  padding: 12px 16px;
 }
 
-.attendance-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  padding: var(--space-sm);
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.attendance-card.present {
-  border-color: rgba(16, 185, 129, 0.45);
-}
-
-.attendance-card.paid {
-  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.45);
-}
-
-.attendance-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-xs);
-}
-
-.attendance-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-xs);
-}
-
-.mini-btn {
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  padding: 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.mini-btn.on {
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.5);
-}
-
-.mini-btn.paid-on {
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.5);
-}
-
-.mini-btn:disabled {
+.inactive-row {
   opacity: 0.5;
+  filter: grayscale(0.5);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.attendance-btn, .payment-btn {
+  width: 100%;
+  max-width: 120px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+}
+
+.attendance-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+.payment-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: #3b82f6;
+  color: #3b82f6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+}
+
+.payment-btn.disabled {
+  opacity: 0.3;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .mini-avatar {

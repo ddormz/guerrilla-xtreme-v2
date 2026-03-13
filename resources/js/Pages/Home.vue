@@ -38,9 +38,9 @@
               <span class="detail-icon">📅</span>
               <span class="detail-text">{{ new Date(event.event_date).toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' }) }}</span>
             </div>
-            <div v-if="event.time" class="detail-item">
+            <div class="detail-item">
               <span class="detail-icon">⏰</span>
-              <span class="detail-text">{{ event.time }}</span>
+              <span class="detail-text">{{ event.time || 'Por confirmar' }}</span>
             </div>
             <div v-if="event.location" class="detail-item">
               <span class="detail-icon">📍</span>

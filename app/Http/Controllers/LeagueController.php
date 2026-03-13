@@ -331,8 +331,20 @@ class LeagueController extends Controller
                 . (($registrationData['payment_option'] ?? 'now') === 'later'
                     ? '<p style="margin:0; font-weight:bold; color:#E10600;">⚠️ Si 24 horas antes del evento no se ha recibido el pago, tu inscripción será cancelada.</p>'
                     : '<p style="margin:0;">Validaremos tu pago y tu inscripción estará asegurada.</p>')
-                . '</div>'
-                . '<p>Detalles del evento:</p>'
+                . '</div>';
+
+            if (($registrationData['is_rex_registered'] ?? true) === false) {
+                $body .= '<div class="highlight-box">'
+                    . '<p style="margin:0 0 8px; font-weight:700;">Acceso por defecto a R.E.X (usuario nuevo)</p>'
+                    . '<ul style="margin:0; padding-left:18px;">'
+                    . '<li><strong>Usuario:</strong> ' . htmlspecialchars($registrationData['email'] ?? 'correo no disponible') . '</li>'
+                    . '<li><strong>Contraseña temporal:</strong> abcd1234</li>'
+                    . '</ul>'
+                    . '<p style="margin:8px 0 0;">Te recomendamos cambiar tu contraseña al ingresar.</p>'
+                    . '</div>';
+            }
+
+            $body .= '<p>Detalles del evento:</p>'
                 . '<ul>'
                 . '<li>Fecha: ' . ($eventData['date'] ?: 'Por confirmar') . '</li>'
                 . (!empty($eventData['location']) ? '<li>Ubicación: ' . htmlspecialchars($eventData['location']) . '</li>' : '')

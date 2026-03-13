@@ -44,9 +44,9 @@
                     <span class="k">Ubicación</span>
                     <p>{{ event.location }}</p>
                   </div>
-                  <div v-if="event.time">
+                  <div>
                     <span class="k">Hora</span>
-                    <p>{{ event.time }}</p>
+                    <p>{{ event.time || 'Por confirmar' }}</p>
                   </div>
                   <div v-if="event.prizes" class="event-block col-span-2">
                     <span class="k text-amber-500">🏆 Premios</span>
@@ -96,7 +96,11 @@
               </div>
 
               <div v-if="form.is_rex_registered === false" class="message-box warn border-amber-500/30">
-                <p>No te preocupes. Se creará automáticamente un perfil básico para ti en nuestra liga para gestionar este torneo.</p>
+                <p>
+                  No te preocupes. Se creará automáticamente un perfil básico para ti en R.E.X.
+                  Tu acceso por defecto será:
+                  <strong>usuario: tu correo</strong> y <strong>contraseña: abcd1234</strong>.
+                </p>
               </div>
               
               <span v-if="form.errors.is_rex_registered" class="form-error">{{ form.errors.is_rex_registered }}</span>

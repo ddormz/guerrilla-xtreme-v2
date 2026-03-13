@@ -323,7 +323,9 @@ class AdminLeagueController extends Controller
                         . '<div class="highlight-box">'
                         . '<p style="margin:0 0 8px; font-weight:600;">🚀 Instrucciones para R.E.X:</p>'
                         . '<p style="margin:0 0 12px; font-size:0.9rem;">Debes ingresar a <a href="https://royal-evolution-x.cl" style="color:#E10600; font-weight:700;">royal-evolution-x.cl</a> con tu cuenta para ver el bracket y reportar tus resultados el día del evento.</p>'
-                        . ($generatedUserId ? '<p style="margin:0; font-size:0.85rem; color:#94a3b8;">* Hemos creado tu usuario con el correo registrado y contraseña temporal: <strong>abcd1234</strong></p>' : '')
+                        . ($generatedUserId
+                            ? '<p style="margin:0; font-size:0.85rem; color:#94a3b8;">* Hemos creado tu usuario en R.E.X. Acceso por defecto: <strong>usuario ' . htmlspecialchars($recipient) . '</strong> y <strong>contraseña abcd1234</strong>.</p>'
+                            : '')
                         . '</div>'
                         . '<div style="margin-top:20px; padding:15px; background:rgba(255,255,255,0.03); border-radius:8px; border-left:4px solid #E10600;">'
                         . '<h4 style="margin:0 0 10px; color:#E10600; text-transform:uppercase; font-size:0.8rem;">Bases y Restricciones:</h4>'

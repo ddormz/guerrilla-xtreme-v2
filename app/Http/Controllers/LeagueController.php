@@ -26,6 +26,11 @@ class LeagueController extends Controller
 
     public function standings(?LeagueSeason $season = null): Response
     {
+        if (!auth()->check() || !auth()->user()->role === UserRole::MiembroGx && !auth()->user()->role === UserRole::Admin) {
+            return Inertia::render('Home', [
+                'flash' => ['error' => 'Solo los Miembros GX pueden ver la tabla de posiciones de la liga.']
+            ]);
+        }
         $activeSeason = $season?->id ? $season : LeagueSeason::where('status', 'en_curso')->first();
 
         if (!$activeSeason) {
@@ -149,7 +154,8 @@ class LeagueController extends Controller
             'whatsapp' => 'required|string|max:50',
             'email' => 'required|email|max:255',
             'is_rex_registered' => 'required|boolean',
-            'proof' => 'required|image|max:5120', // Max 5MB
+            'payment_option' => 'required|string|in:now,later',
+            'proof' => 'required_if:payment_option,now|image|max:5120', // Max 5MB
         ]);
 
         // Duplicate prevention
@@ -210,8 +216,9 @@ class LeagueController extends Controller
             'is_rex_registered' => $validated['is_rex_registered'],
             'generated_user_id' => $generatedUserId,
             'proof_path' => $proofPath,
+            'payment_option' => $validated['payment_option'],
             'status' => 'pending',
-            'payment_date' => now(),
+            'payment_date' => $validated['payment_option'] === 'now' ? now() : null,
         ]);
 
         AuditLogger::log('register_tournament', 'TournamentRegistration', $registration->id, [
@@ -223,11 +230,17 @@ class LeagueController extends Controller
 
         // Send confirmation receipt email
         try {
+            $statusText = $validated['payment_option'] === 'now' 
+                ? 'Hemos recibido tu pre-inscripción y comprobante de pago. Te notificaremos una vez que lo validemos.'
+                : 'Tu pre-inscripción ha sido recibida. Recuerda que debes realizar el pago antes del evento.';
+
             $body = '<p>Hola <strong>' . htmlspecialchars($validated['blader_name']) . '</strong>,</p>'
-                . '<p>Hemos recibido tu pre-inscripción y comprobante de pago para el torneo <strong>' . htmlspecialchars($event->name) . '</strong>.</p>'
+                . '<p>' . $statusText . '</p>'
                 . '<div class="highlight-box">'
                 . '<p style="margin:0 0 4px; font-weight:600; color:#F59E0B;">Estado: En revisión</p>'
-                . '<p style="margin:0;">Te notificaremos por este medio una vez que validemos tu pago.</p>'
+                . ($validated['payment_option'] === 'later' 
+                    ? '<p style="margin:0; font-weight:bold; color:#E10600;">⚠️ Si 24 horas antes del evento no se ha recibido el pago, tu inscripción será cancelada.</p>'
+                    : '<p style="margin:0;">Validaremos tu pago y tu inscripción estará asegurada.</p>')
                 . '</div>'
                 . '<p>Detalles del evento:</p>'
                 . '<ul>'
@@ -246,7 +259,11 @@ class LeagueController extends Controller
             \Illuminate\Support\Facades\Log::error("Failed to send tournament registration receipt email: " . $e->getMessage());
         }
 
-        return back()->with('success', 'Registro y comprobante recibidos. Tu inscripción está en revisión.');
+        $msg = $validated['payment_option'] === 'now' 
+            ? 'Registro y comprobante recibidos. Tu inscripción está en revisión.'
+            : 'Pre-registro completado. Recuerda pagar antes de las 24hrs previas al evento.';
+
+        return back()->with('success', $msg);
     }
 
     public function playerProfile(LeaguePlayer $player): Response

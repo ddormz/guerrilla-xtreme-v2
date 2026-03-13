@@ -16,34 +16,36 @@
       </div>
 
       <div v-if="isTournament" class="grid grid-cols-1 lg:grid-cols-3 gap-xl">
-        <section class="card lg:col-span-2">
-          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-md mb-md">
+        <section class="card lg:col-span-2 p-0 overflow-hidden border-white/5">
+          <div class="p-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-md border-b border-white/5 bg-white/[0.02]">
             <div>
-              <h2 class="text-lg font-black">Preinscritos al Torneo</h2>
-              <p class="text-sm text-secondary">Los torneos se gestionan en la app externa, aquí solo se muestra el pre-registro.</p>
+              <h2 class="text-lg font-black text-white">Preinscritos al Torneo</h2>
+              <p class="text-xs text-secondary italic">Gestión de pre-registros y validación de pagos.</p>
             </div>
-            <button v-if="event.registrations && event.registrations.length" @click="exportRegistrations" class="btn btn-outline btn-sm whitespace-nowrap">⬇️ Exportar DB CSV</button>
+            <button v-if="event.registrations && event.registrations.length" @click="exportRegistrations" class="btn btn-outline btn-sm whitespace-nowrap">⬇️ Exportar CSV</button>
           </div>
 
-          <div class="flex flex-col md:flex-row gap-md mb-lg">
-            <div class="registration-filters flex flex-wrap gap-xs">
-              <button @click="regFilterStatus = 'all'" class="filter-pill" :class="{ active: regFilterStatus === 'all' }">Todos</button>
-              <button @click="regFilterStatus = 'confirmed'" class="filter-pill" :class="{ active: regFilterStatus === 'confirmed' }">Validado</button>
-              <button @click="regFilterStatus = 'pending'" class="filter-pill" :class="{ active: regFilterStatus === 'pending' }">Pendiente</button>
-              <button @click="regFilterStatus = 'rejected'" class="filter-pill" :class="{ active: regFilterStatus === 'rejected' }">Rechazado</button>
-            </div>
-            <div class="flex-1">
-              <input type="text" v-model="regSearch" class="form-input form-input-sm w-full" placeholder="Buscar por blader o nombre..." />
+          <div class="p-lg pb-0">
+            <div class="flex flex-col md:flex-row gap-md mb-lg">
+              <div class="registration-filters flex flex-wrap gap-xs">
+                <button @click="regFilterStatus = 'all'" class="filter-pill" :class="{ active: regFilterStatus === 'all' }">Todos</button>
+                <button @click="regFilterStatus = 'confirmed'" class="filter-pill" :class="{ active: regFilterStatus === 'confirmed' }">Validado</button>
+                <button @click="regFilterStatus = 'pending'" class="filter-pill" :class="{ active: regFilterStatus === 'pending' }">Pendiente</button>
+                <button @click="regFilterStatus = 'rejected'" class="filter-pill" :class="{ active: regFilterStatus === 'rejected' }">Rechazado</button>
+              </div>
+              <div class="flex-1">
+                <input type="text" v-model="regSearch" class="form-input form-input-sm w-full" placeholder="Buscar por blader..." />
+              </div>
             </div>
           </div>
 
           <div v-if="filteredRegistrations.length" class="overflow-x-auto">
-            <table class="gx-table text-sm">
+            <table class="gx-table">
               <thead>
                 <tr>
                   <th>Blader</th>
-                  <th>Nombre Real</th>
                   <th>Contacto</th>
+                  <th class="text-center">Tipo Pago</th>
                   <th class="text-center">REX</th>
                   <th class="text-center">Estado</th>
                   <th class="text-right">Acciones</th>
@@ -53,16 +55,23 @@
                 <tr v-for="reg in filteredRegistrations" :key="reg.id" class="table-row">
                   <td>
                     <div class="flex items-center gap-sm">
-                      <div class="mini-avatar bg-surface border-gx-red/20 text-gx-red">{{ reg.blader_name.charAt(0) }}</div>
-                      <strong>{{ reg.blader_name }}</strong>
+                      <div class="mini-avatar-text">{{ reg.blader_name.charAt(0) }}</div>
+                      <div>
+                        <div class="font-black text-white leading-tight uppercase">{{ reg.blader_name }}</div>
+                        <div class="text-[10px] text-secondary">{{ reg.first_name }} {{ reg.last_name }}</div>
+                      </div>
                     </div>
                   </td>
-                  <td>{{ reg.first_name }} {{ reg.last_name }}</td>
                   <td>
                     <div class="text-[10px] leading-tight text-secondary">
                       <div>{{ reg.email }}</div>
-                      <div>{{ reg.whatsapp }}</div>
+                      <div class="font-bold text-white/60">{{ reg.whatsapp }}</div>
                     </div>
+                  </td>
+                  <td class="text-center">
+                    <span class="badge badge-xs" :class="reg.payment_option === 'now' ? 'badge-blue' : 'badge-outline'">
+                      {{ reg.payment_option === 'now' ? 'AHORA' : 'DESPUÉS' }}
+                    </span>
                   </td>
                   <td class="text-center">
                     <span class="badge badge-xs" :class="reg.is_rex_registered ? 'badge-blue' : 'badge-amber'">
@@ -70,37 +79,54 @@
                     </span>
                   </td>
                   <td class="text-center">
-                    <span class="badge badge-xs" :class="regStatusBadge(reg.status)">{{ reg.status === 'confirmed' ? 'Validado' : (reg.status === 'pending' ? 'Pendiente' : 'Rechazado') }}</span>
+                    <span class="badge badge-xs" :class="regStatusBadge(reg.status)">
+                      {{ reg.status === 'confirmed' ? 'VALIDADO' : (reg.status === 'pending' ? 'PENDIENTE' : 'RECHAZADO') }}
+                    </span>
                   </td>
                   <td class="text-right">
                     <div class="flex gap-xs justify-end">
-                      <button @click="openReviewModal(reg)" class="btn btn-primary btn-xs px-2" title="Revisar Pago">Validar</button>
+                      <button @click="openReviewModal(reg)" class="btn btn-primary btn-xs px-2" :title="reg.payment_option === 'now' ? 'Validar Pago' : 'Confirmar Inscripción'">
+                        {{ reg.payment_option === 'now' ? 'VALIDAR' : 'AUTO-OK' }}
+                      </button>
                       <button @click="openEditRegModal(reg)" class="btn btn-outline btn-xs px-2" title="Editar">✎</button>
-                      <button @click="handleDeleteRegistration(reg.id)" class="btn btn-danger btn-xs px-2" title="Eliminar">🗑️</button>
+                      <button @click="handleDeleteRegistration(reg.id)" class="btn btn-error btn-xs px-2" title="Eliminar">🗑️</button>
                     </div>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div v-else class="text-center text-secondary py-xl italic bg-black/10 rounded-xl border border-dashed border-white/5">
+          <div v-else class="m-lg text-center text-secondary py-xl italic bg-black/10 rounded-xl border border-dashed border-white/5">
             No se encontraron preinscripciones con estos filtros.
           </div>
         </section>
 
-        <section class="card">
-          <h2 class="text-sm font-black mb-md">Resumen</h2>
-          <div class="summary-box">
-            <div>
-              <span class="k">Preinscritos</span>
-              <strong>{{ event.registrations?.length || 0 }}</strong>
-            </div>
-            <div>
-              <span class="k">Tipo</span>
-              <strong>Torneo</strong>
+        <section class="card space-y-lg border-white/5">
+          <div>
+            <h2 class="text-xs font-black uppercase tracking-widest text-secondary mb-md">Resumen de Torneo</h2>
+            <div class="p-md bg-black/40 rounded-xl border border-white/5 space-y-md">
+              <div class="flex justify-between items-center text-sm">
+                <span class="opacity-70 uppercase tracking-tighter">Preinscritos</span>
+                <span class="font-black text-gx-red">{{ event.registrations?.length || 0 }}</span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="opacity-70 uppercase tracking-tighter">Validados</span>
+                <span class="font-black text-accent-green">{{ event.registrations?.filter(r => r.status === 'confirmed').length || 0 }}</span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="opacity-70 uppercase tracking-tighter">Pendientes</span>
+                <span class="font-black text-amber-500">{{ event.registrations?.filter(r => r.status === 'pending').length || 0 }}</span>
+              </div>
             </div>
           </div>
-          <p class="text-xs text-secondary mt-md">No se habilitan asistencias, cruces ni arbitraje desde este panel para eventos tipo torneo.</p>
+
+          <div class="p-md bg-gx-red/5 border border-gx-red/20 rounded-xl">
+            <p class="text-[10px] uppercase font-black text-gx-red leading-tight mb-xs">Aviso importante</p>
+            <p class="text-[10px] text-secondary leading-normal">
+              Este panel solo gestiona el control de pagos y la base de datos de contacto. 
+              El bracket y los resultados en tiempo real deben manejarse en el panel de Administrador de **R.E.X**.
+            </p>
+          </div>
         </section>
       </div>
 

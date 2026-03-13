@@ -71,7 +71,10 @@
             <!-- STEP 2: REX CHECK -->
             <section v-if="currentStep === 2" class="stagger">
               <h3 class="section-title">¿Tienes cuenta en R.E.X?</h3>
-              <p class="text-secondary mb-md italic text-sm">REX es nuestra plataforma oficial de gestión de batallas y bladers.</p>
+              <p class="text-secondary mb-md italic text-sm">
+                REX es nuestra plataforma oficial de gestión de batallas y bladers. 
+                <a href="https://royal-evolution-x.cl/dashboard" target="_blank" class="text-gx-red font-bold hover:underline ml-1">Ir a R.E.X →</a>
+              </p>
               
               <div class="rex-options mb-lg">
                 <button type="button" class="rex-option" :class="{ active: form.is_rex_registered === true }" @click="form.is_rex_registered = true">
@@ -157,54 +160,75 @@
             <section v-if="currentStep === 5" class="stagger">
               <div class="mb-xl text-center">
                 <div class="w-16 h-16 bg-accent-green/10 text-accent-green rounded-full flex items-center justify-center mx-auto mb-md">💳</div>
-                <h3 class="section-title m-0">Información de pago</h3>
-                <p class="text-secondary mt-sm">Realiza la transferencia por <strong class="text-white">{{ new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(event.registration_cost) }}</strong></p>
+                <h3 class="section-title m-0">¿Deseas pagar ahora?</h3>
+                <p class="text-secondary mt-sm">Puedes asegurar tu cupo de inmediato o pagar días antes del evento.</p>
               </div>
 
-              <div class="payment-card mb-xl">
-                <div class="payment-row">
-                  <span class="payment-label">Banco</span>
-                  <p class="payment-value">{{ event.bank_name || 'Banco Estado' }}</p>
-                </div>
-                <div class="payment-row">
-                  <span class="payment-label">Titular</span>
-                  <p class="payment-value">{{ event.account_holder || 'Daniel Orellana' }}</p>
-                </div>
-                <div class="payment-row">
-                  <span class="payment-label">Cuenta</span>
-                  <p class="payment-value">{{ event.account_number || '20539169' }}</p>
-                </div>
-                <div class="payment-row">
-                  <span class="payment-label">Email</span>
-                  <p class="payment-value">{{ event.account_email || 'ventas@gxbeyblade.com' }}</p>
-                </div>
-                <div v-if="event.payment_instructions" class="payment-row col-span-2">
-                  <span class="payment-label">Instrucciones</span>
-                  <p class="payment-value italic">{{ event.payment_instructions }}</p>
-                </div>
+              <div class="rex-options mb-xl">
+                <button type="button" class="rex-option" :class="{ active: form.payment_option === 'now' }" @click="form.payment_option = 'now'">
+                  <div class="text-xl mb-xs">⚡</div>
+                  Pagar ahora
+                </button>
+                <button type="button" class="rex-option" :class="{ active: form.payment_option === 'later' }" @click="form.payment_option = 'later'">
+                  <div class="text-xl mb-xs">📅</div>
+                  Pagar días antes
+                </button>
               </div>
 
-              <div class="proof-upload p-xl text-center border-2 border-dashed border-white/10 rounded-xl bg-white/5">
-                <input ref="proofInput" type="file" @change="onProofSelected" accept="image/*" class="sr-only" id="proof_file" />
-                
-                <div v-if="!form.proof" class="space-y-sm">
-                  <div class="text-3xl">📄</div>
-                  <h3 class="font-bold">Sube tu comprobante *</h3>
-                  <p class="text-xs text-secondary">Imagen JPG, PNG o PDF (Máx 5MB)</p>
-                  <button class="btn btn-secondary btn-sm mt-md" type="button" @click="triggerProofPicker">Seleccionar archivo</button>
+              <div v-if="form.payment_option === 'now'" class="stagger">
+                <div class="message-box info border-accent-green/30 bg-accent-green/5 text-accent-green mb-lg">
+                  <p>✅ Al momento de subir el comprobante, validaremos tu pago y tu inscripción estará <strong>asegurada</strong>.</p>
                 </div>
 
-                <div v-else class="proof-selected">
-                  <div class="flex items-center justify-center gap-sm">
-                    <span class="text-2xl">📸</span>
-                    <div class="text-left">
-                      <p class="text-sm font-bold truncate max-w-[200px]">{{ form.proof.name }}</p>
-                      <p class="text-xs text-secondary">{{ (form.proof.size / 1024 / 1024).toFixed(2) }} MB</p>
-                    </div>
+                <div class="payment-card mb-xl">
+                  <div class="payment-row">
+                    <span class="payment-label">Banco</span>
+                    <p class="payment-value">{{ event.bank_name || 'Banco Estado' }}</p>
                   </div>
-                  <button type="button" @click="removeProof" class="text-gx-red text-sm font-bold mt-sm block mx-auto">Eliminar comprobante</button>
+                  <div class="payment-row">
+                    <span class="payment-label">Titular</span>
+                    <p class="payment-value">{{ event.account_holder || 'Daniel Orellana' }}</p>
+                  </div>
+                  <div class="payment-row">
+                    <span class="payment-label">Cuenta</span>
+                    <p class="payment-value">{{ event.account_number || '20539169' }}</p>
+                  </div>
+                  <div class="payment-row">
+                    <span class="payment-label">Email</span>
+                    <p class="payment-value">{{ event.account_email || 'ventas@gxbeyblade.com' }}</p>
+                  </div>
+                  <div v-if="event.payment_instructions" class="payment-row col-span-2">
+                    <span class="payment-label">Instrucciones</span>
+                    <p class="payment-value italic">{{ event.payment_instructions }}</p>
+                  </div>
                 </div>
-                <span v-if="form.errors.proof" class="form-error block mt-sm">{{ form.errors.proof }}</span>
+
+                <div class="proof-upload p-xl text-center border-2 border-dashed border-white/10 rounded-xl bg-white/5">
+                  <input ref="proofInput" type="file" @change="onProofSelected" accept="image/*" class="sr-only" id="proof_file" />
+                  
+                  <div v-if="!form.proof" class="space-y-sm">
+                    <div class="text-3xl">📄</div>
+                    <h3 class="font-bold">Sube tu comprobante *</h3>
+                    <p class="text-xs text-secondary">Imagen JPG, PNG o PDF (Máx 5MB)</p>
+                    <button class="btn btn-secondary btn-sm mt-md" type="button" @click="triggerProofPicker">Seleccionar archivo</button>
+                  </div>
+
+                  <div v-else class="proof-selected">
+                    <div class="flex items-center justify-center gap-sm">
+                      <span class="text-2xl">📸</span>
+                      <div class="text-left">
+                        <p class="text-sm font-bold truncate max-w-[200px]">{{ form.proof.name }}</p>
+                        <p class="text-xs text-secondary">{{ (form.proof.size / 1024 / 1024).toFixed(2) }} MB</p>
+                      </div>
+                    </div>
+                    <button type="button" @click="removeProof" class="text-gx-red text-sm font-bold mt-sm block mx-auto">Eliminar comprobante</button>
+                  </div>
+                  <span v-if="form.errors.proof" class="form-error block mt-sm">{{ form.errors.proof }}</span>
+                </div>
+              </div>
+
+              <div v-if="form.payment_option === 'later'" class="message-box warn border-gx-red/30 bg-gx-red/5 text-gx-red-light mb-xl">
+                <p>⚠️ <strong>Atención:</strong> Si 24 horas antes del evento no se ha recibido el pago, tu inscripción será <strong>cancelada</strong> sin previo aviso.</p>
               </div>
             </section>
 
@@ -212,7 +236,7 @@
               <button type="button" class="btn btn-secondary" @click="prevStep" :disabled="currentStep === 1">← Anterior</button>
               <button v-if="currentStep < 5" type="button" class="btn btn-primary" @click="nextStep" :disabled="currentStep === 1 && isRegistered">Siguiente →</button>
               <button v-else type="submit" class="btn btn-primary" :disabled="form.processing">
-                {{ form.processing ? 'Enviando...' : 'Confirmar registro' }}
+                {{ form.processing ? 'Enviando...' : (form.payment_option === 'later' ? 'Completar pre-registro' : 'Confirmar registro y pago') }}
               </button>
             </div>
           </form>
@@ -249,6 +273,7 @@ const form = useForm({
   whatsapp: '',
   email: '',
   is_rex_registered: null,
+  payment_option: 'now',
   proof: null,
 });
 
@@ -332,7 +357,7 @@ const submit = () => {
     return false;
   }
 
-  if (!form.proof) {
+  if (form.payment_option === 'now' && !form.proof) {
     toastWarning('Debes subir el comprobante de pago para finalizar.');
     return;
   }

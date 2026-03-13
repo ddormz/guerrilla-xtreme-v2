@@ -22,6 +22,7 @@ class TournamentRegistration extends Model
         'is_rex_registered',
         'generated_user_id',
         'proof_path',
+        'payment_option',
         'status',
         'payment_date',
         'validated_at',

@@ -15,6 +15,9 @@ use App\Services\AuditLogger;
 use App\Services\LeagueService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -100,6 +103,21 @@ class LeagueController extends Controller
     {
         $events = LeagueEvent::with(['season'])
             ->where('event_type', EventType::Torneo)
+            ->select([
+                'id',
+                'season_id',
+                'name',
+                'event_date',
+                'event_type',
+                'status',
+                'is_live',
+                'description',
+                'location',
+                'time',
+                'prizes',
+                'rules',
+                'registration_cost',
+            ])
             ->orderBy('event_date', 'desc')
             ->get()
             ->map(fn ($e) => [
@@ -146,32 +164,66 @@ class LeagueController extends Controller
 
     public function storeRegistration(Request $request, LeagueEvent $event)
     {
+        $isRexRegistered = $request->boolean('is_rex_registered');
+        $requiresContactData = !$isRexRegistered;
+
         $validated = $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'blader_name' => 'required|string|max:255',
-            'birth_date' => 'required|date',
-            'whatsapp' => 'required|string|max:50',
-            'email' => 'required|email|max:255',
-            'is_rex_registered' => 'required|boolean',
-            'payment_option' => 'required|string|in:now,later',
-            'proof' => $request->payment_option === 'now' ? 'required|image|max:5120' : 'nullable',
+            'first_name' => [Rule::requiredIf($requiresContactData), 'nullable', 'string', 'max:255'],
+            'last_name' => [Rule::requiredIf($requiresContactData), 'nullable', 'string', 'max:255'],
+            'blader_name' => ['required', 'string', 'max:255'],
+            'birth_date' => [Rule::requiredIf($requiresContactData), 'nullable', 'date'],
+            'whatsapp' => [Rule::requiredIf($requiresContactData), 'nullable', 'string', 'max:50'],
+            'email' => ['required', 'email', 'max:255'],
+            'is_rex_registered' => ['required', 'boolean'],
+            'payment_option' => ['required', Rule::in(['now', 'later'])],
+            'proof' => [
+                Rule::requiredIf($request->input('payment_option') === 'now'),
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
+        ], [
+            'first_name.required' => 'Debes ingresar tu nombre.',
+            'last_name.required' => 'Debes ingresar tu apellido.',
+            'birth_date.required' => 'Debes ingresar tu fecha de nacimiento.',
+            'whatsapp.required' => 'Debes ingresar tu WhatsApp.',
+            'email.required' => 'Debes ingresar un correo electrónico.',
+            'blader_name.required' => 'Debes ingresar tu nombre de Blader.',
+            'proof.required' => 'Debes subir el comprobante para confirmar el pago.',
+            'proof.mimes' => 'El comprobante debe ser JPG, JPEG, PNG o WEBP.',
+            'proof.max' => 'El comprobante no puede superar los 5MB.',
         ]);
+
+        if ($isRexRegistered && auth()->check()) {
+            $user = auth()->user();
+            $nameParts = collect(explode(' ', trim($user->name ?? '')))->filter()->values();
+
+            $validated['first_name'] = $validated['first_name'] ?: ($nameParts->first() ?? null);
+            $validated['last_name'] = $validated['last_name'] ?: ($nameParts->slice(1)->implode(' ') ?: null);
+            $validated['email'] = $validated['email'] ?: ($user->email ?? null);
+            $validated['whatsapp'] = $validated['whatsapp'] ?: ($user->phone ?? null);
+        }
+
+        $validated['first_name'] = $validated['first_name'] ?: null;
+        $validated['last_name'] = $validated['last_name'] ?: null;
+        $validated['birth_date'] = $validated['birth_date'] ?: null;
+        $validated['whatsapp'] = $validated['whatsapp'] ?: null;
+        $validated['email'] = $validated['email'] ?: null;
 
         // Duplicate prevention
         $query = TournamentRegistration::where('event_id', $event->id);
-        if (auth()->check()) {
-            $query->where(function($q) use ($validated) {
-                $q->where('email', $validated['email'])
-                  ->orWhere('blader_name', $validated['blader_name'])
-                  ->orWhere('generated_user_id', auth()->id());
-            });
-        } else {
-            $query->where(function($q) use ($validated) {
-                $q->where('email', $validated['email'])
-                  ->orWhere('blader_name', $validated['blader_name']);
-            });
-        }
+        $query->where(function ($q) use ($validated) {
+            $q->where('blader_name', $validated['blader_name']);
+
+            if (!empty($validated['email'])) {
+                $q->orWhere('email', $validated['email']);
+            }
+
+            if (auth()->check()) {
+                $q->orWhere('generated_user_id', auth()->id());
+            }
+        });
 
         if ($query->exists()) {
             return back()->with('error', 'Ya te encuentras pre-registrado en este evento.');
@@ -207,12 +259,12 @@ class LeagueController extends Controller
             'event_id' => $event->id,
             'player_id' => auth()->check() ? auth()->user()->player?->id : null,
             'is_internal' => false,
-            'first_name' => $validated['first_name'],
-            'last_name' => $validated['last_name'],
+            'first_name' => $validated['first_name'] ?? null,
+            'last_name' => $validated['last_name'] ?? null,
             'blader_name' => $validated['blader_name'],
-            'birth_date' => $validated['birth_date'],
-            'whatsapp' => $validated['whatsapp'],
-            'email' => $validated['email'],
+            'birth_date' => $validated['birth_date'] ?? null,
+            'whatsapp' => $validated['whatsapp'] ?? null,
+            'email' => $validated['email'] ?? null,
             'is_rex_registered' => $validated['is_rex_registered'],
             'generated_user_id' => $generatedUserId,
             'proof_path' => $proofPath,
@@ -228,42 +280,142 @@ class LeagueController extends Controller
             'status' => 'pending',
         ]);
 
-        // Send confirmation receipt email
-        try {
-            $statusText = $validated['payment_option'] === 'now' 
-                ? 'Hemos recibido tu pre-inscripción y comprobante de pago. Te notificaremos una vez que lo validemos.'
-                : 'Tu pre-inscripción ha sido recibida. Recuerda que debes realizar el pago antes del evento.';
+        $registrationData = [
+            'id' => $registration->id,
+            'blader_name' => $this->displayBladerName($registration->blader_name, $registration->first_name, $registration->last_name),
+            'first_name' => $registration->first_name,
+            'last_name' => $registration->last_name,
+            'email' => $registration->email,
+            'whatsapp' => $registration->whatsapp,
+            'is_rex_registered' => (bool) $registration->is_rex_registered,
+            'payment_option' => $registration->payment_option,
+            'proof_path' => $registration->proof_path,
+        ];
 
-            $body = '<p>Hola <strong>' . htmlspecialchars($validated['blader_name']) . '</strong>,</p>'
-                . '<p>' . $statusText . '</p>'
-                . '<div class="highlight-box">'
-                . '<p style="margin:0 0 4px; font-weight:600; color:#F59E0B;">Estado: En revisión</p>'
-                . ($validated['payment_option'] === 'later' 
-                    ? '<p style="margin:0; font-weight:bold; color:#E10600;">⚠️ Si 24 horas antes del evento no se ha recibido el pago, tu inscripción será cancelada.</p>'
-                    : '<p style="margin:0;">Validaremos tu pago y tu inscripción estará asegurada.</p>')
-                . '</div>'
-                . '<p>Detalles del evento:</p>'
-                . '<ul>'
-                . '<li>Fecha: ' . ($event->event_date ? $event->event_date->format('d/m/Y') : 'Por confirmar') . '</li>'
-                . ($event->location ? '<li>Ubicación: ' . htmlspecialchars($event->location) . '</li>' : '')
-                . '</ul>';
+        $eventData = [
+            'id' => $event->id,
+            'name' => $event->name,
+            'date' => $event->event_date?->format('d/m/Y'),
+            'location' => $event->location,
+        ];
 
-            \Illuminate\Support\Facades\Mail::to($validated['email'])->send(
-                new \App\Mail\GxStyledMail(
-                    subject: 'Registro Recibido - ' . $event->name,
-                    heading: 'Hemos recibido tu registro',
-                    body: $body,
-                )
-            );
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Failed to send tournament registration receipt email: " . $e->getMessage());
-        }
+        // Send mail after response to keep registration flow fast.
+        app()->terminating(function () use ($registrationData, $eventData) {
+            $this->sendRegistrantReceiptMail($registrationData, $eventData);
+            $this->sendAdminRegistrationAlertMail($registrationData, $eventData);
+        });
 
         $msg = $validated['payment_option'] === 'now' 
             ? 'Registro y comprobante recibidos. Tu inscripción está en revisión.'
             : 'Pre-registro completado. Recuerda pagar antes de las 24hrs previas al evento.';
 
         return back()->with('success', $msg);
+    }
+
+    private function sendRegistrantReceiptMail(array $registrationData, array $eventData): void
+    {
+        $recipient = $registrationData['email'] ?? null;
+        if (empty($recipient)) {
+            return;
+        }
+
+        try {
+            $statusText = ($registrationData['payment_option'] ?? 'now') === 'now'
+                ? 'Hemos recibido tu pre-inscripción y comprobante de pago. Te notificaremos una vez que lo validemos.'
+                : 'Tu pre-inscripción ha sido recibida. Recuerda que debes realizar el pago antes del evento.';
+
+            $body = '<p>Hola <strong>' . htmlspecialchars($registrationData['blader_name']) . '</strong>,</p>'
+                . '<p>' . $statusText . '</p>'
+                . '<div class="highlight-box">'
+                . '<p style="margin:0 0 4px; font-weight:600; color:#F59E0B;">Estado: En revisión</p>'
+                . (($registrationData['payment_option'] ?? 'now') === 'later'
+                    ? '<p style="margin:0; font-weight:bold; color:#E10600;">⚠️ Si 24 horas antes del evento no se ha recibido el pago, tu inscripción será cancelada.</p>'
+                    : '<p style="margin:0;">Validaremos tu pago y tu inscripción estará asegurada.</p>')
+                . '</div>'
+                . '<p>Detalles del evento:</p>'
+                . '<ul>'
+                . '<li>Fecha: ' . ($eventData['date'] ?: 'Por confirmar') . '</li>'
+                . (!empty($eventData['location']) ? '<li>Ubicación: ' . htmlspecialchars($eventData['location']) . '</li>' : '')
+                . '</ul>';
+
+            Mail::to($recipient)->send(
+                new \App\Mail\GxStyledMail(
+                    subject: 'Registro Recibido - ' . $eventData['name'],
+                    heading: 'Hemos recibido tu registro',
+                    body: $body,
+                )
+            );
+        } catch (\Throwable $e) {
+            Log::error('Failed to send tournament registration receipt email: ' . $e->getMessage());
+        }
+    }
+
+    private function sendAdminRegistrationAlertMail(array $registrationData, array $eventData): void
+    {
+        $adminRecipient = config('mail.admin_registration_to', 'danielorellanaramirez@gmail.com');
+        if (empty($adminRecipient)) {
+            return;
+        }
+
+        $paymentOption = ($registrationData['payment_option'] ?? 'now') === 'now' ? 'Pagó al tiro' : 'Pagará después';
+        $proofPath = $registrationData['proof_path'] ?? null;
+        $proofPublicUrl = $proofPath ? asset('storage/' . ltrim($proofPath, '/')) : null;
+        $reviewUrl = route('admin.events.show', $eventData['id']);
+
+        $body = '<p>Se registró una nueva preinscripción para el torneo <strong>' . htmlspecialchars($eventData['name']) . '</strong>.</p>'
+            . '<div class="highlight-box">'
+            . '<p style="margin:0 0 8px; font-weight:700;">Datos del blader</p>'
+            . '<ul style="margin:0; padding-left:18px;">'
+            . '<li><strong>ID registro:</strong> #' . (int) ($registrationData['id'] ?? 0) . '</li>'
+            . '<li><strong>Blader:</strong> ' . htmlspecialchars($registrationData['blader_name']) . '</li>'
+            . '<li><strong>Nombre:</strong> ' . htmlspecialchars(trim(($registrationData['first_name'] ?? '') . ' ' . ($registrationData['last_name'] ?? '')) ?: 'No informado') . '</li>'
+            . '<li><strong>Email:</strong> ' . htmlspecialchars($registrationData['email'] ?? 'No informado') . '</li>'
+            . '<li><strong>WhatsApp:</strong> ' . htmlspecialchars($registrationData['whatsapp'] ?? 'No informado') . '</li>'
+            . '<li><strong>Registrado en R.E.X:</strong> ' . (($registrationData['is_rex_registered'] ?? false) ? 'Sí' : 'No') . '</li>'
+            . '<li><strong>Pago:</strong> ' . $paymentOption . '</li>'
+            . '<li><strong>Fecha evento:</strong> ' . htmlspecialchars($eventData['date'] ?: 'Por confirmar') . '</li>'
+            . '</ul>'
+            . '</div>';
+
+        if (!empty($proofPublicUrl)) {
+            $body .= '<p>Comprobante adjunto en este correo. También puedes verlo aquí: <a href="'
+                . htmlspecialchars($proofPublicUrl)
+                . '" style="color:#E10600; font-weight:700;">Abrir comprobante</a>.</p>';
+        } else {
+            $body .= '<p><strong>Comprobante:</strong> No adjuntó (marcó pago posterior).</p>';
+        }
+
+        $body .= '<p>Pulsa el botón para revisar y validar la inscripción desde el panel admin.</p>';
+
+        try {
+            $mail = new \App\Mail\GxStyledMail(
+                subject: 'Nueva Preinscripción - ' . $eventData['name'],
+                heading: 'Nueva inscripción recibida',
+                body: $body,
+                ctaText: 'Revisar y validar inscripción',
+                ctaUrl: $reviewUrl,
+            );
+
+            if (!empty($proofPath)) {
+                $safeBlader = preg_replace('/[^A-Za-z0-9\-_]/', '_', $registrationData['blader_name'] ?? 'blader');
+                $extension = pathinfo($proofPath, PATHINFO_EXTENSION) ?: 'jpg';
+                $mail->attachFromStorageDisk('public', $proofPath, "comprobante-{$safeBlader}.{$extension}");
+            }
+
+            Mail::to($adminRecipient)->send($mail);
+        } catch (\Throwable $e) {
+            Log::error('Failed to send admin tournament registration alert email: ' . $e->getMessage());
+        }
+    }
+
+    private function displayBladerName(?string $bladerName, ?string $firstName, ?string $lastName): string
+    {
+        if (!empty($bladerName)) {
+            return $bladerName;
+        }
+
+        $fallback = trim(($firstName ?? '') . ' ' . ($lastName ?? ''));
+        return $fallback !== '' ? $fallback : 'Blader';
     }
 
     public function playerProfile(LeaguePlayer $player): Response

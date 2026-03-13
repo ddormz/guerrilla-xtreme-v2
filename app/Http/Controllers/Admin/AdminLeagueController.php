@@ -10,9 +10,12 @@ use App\Models\LeagueEvent;
 use App\Models\LeagueMatch;
 use App\Models\LeaguePlayer;
 use App\Models\LeagueSeason;
+use App\Models\TournamentRegistration;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -234,19 +237,60 @@ class AdminLeagueController extends Controller
 
     public function showEvent(LeagueEvent $event): Response
     {
-        $event->load(['season', 'matches.player_a', 'matches.player_b', 'matches.referee', 'matches.winner', 'registrations.generatedUser']);
-        $players = LeaguePlayer::with('user')->where('active', true)->get();
+        $event->load([
+            'season:id,name',
+            'registrations' => fn ($q) => $q
+                ->select([
+                    'id',
+                    'event_id',
+                    'blader_name',
+                    'first_name',
+                    'last_name',
+                    'whatsapp',
+                    'email',
+                    'is_rex_registered',
+                    'generated_user_id',
+                    'proof_path',
+                    'payment_option',
+                    'status',
+                    'payment_date',
+                    'validation_notes',
+                    'created_at',
+                ])
+                ->orderByDesc('created_at'),
+            'registrations.generatedUser:id,name,email',
+        ]);
 
-        $attendances = LeagueAttendance::where('event_id', $event->id)
-            ->get()
-            ->mapWithKeys(fn (LeagueAttendance $attendance) => [
-                $attendance->player_id => [
-                    'present' => (bool) $attendance->present,
-                    'paid' => (bool) $attendance->paid,
-                ],
+        $players = collect();
+        $attendances = collect();
+        $referees = collect();
+
+        if ($event->event_type !== EventType::Torneo) {
+            $event->load([
+                'matches' => fn ($q) => $q->orderBy('id'),
+                'matches.player_a',
+                'matches.player_b',
+                'matches.referee:id,name,blader_name',
+                'matches.winner',
             ]);
 
-        $referees = User::whereIn('role', ['admin', 'arbitro_gx'])->get(['id', 'name', 'blader_name']);
+            $players = LeaguePlayer::with('user:id,avatar_path')
+                ->where('active', true)
+                ->get(['id', 'user_id', 'blader_name', 'avatar_path', 'active']);
+
+            $attendances = LeagueAttendance::where('event_id', $event->id)
+                ->get()
+                ->mapWithKeys(fn (LeagueAttendance $attendance) => [
+                    $attendance->player_id => [
+                        'present' => (bool) $attendance->present,
+                        'paid' => (bool) $attendance->paid,
+                    ],
+                ]);
+
+            $referees = User::whereIn('role', ['admin', 'arbitro_gx'])->get(['id', 'name', 'blader_name']);
+        } else {
+            $event->setRelation('matches', collect());
+        }
 
         return Inertia::render('Admin/League/Show', [
             'event' => $event,
@@ -264,33 +308,42 @@ class AdminLeagueController extends Controller
         ]);
 
         $event = $registration->event;
+        $recipient = $registration->email;
+        $bladerName = $this->registrationDisplayName($registration);
+        $eventName = $event?->name ?? 'Torneo GX';
+        $eventRules = $event?->rules;
+        $generatedUserId = $registration->generated_user_id;
 
-        // Send confirmation email
-        try {
-            $body = '<p>¡Hola <strong>' . htmlspecialchars($registration->blader_name) . '</strong>!</p>'
-                . '<p>Tu pago ha sido validado y tu inscripción al torneo <strong>' . htmlspecialchars($event->name) . '</strong> está <strong style="color:#22c55e;">Confirmada</strong>.</p>'
-                . '<div class="highlight-box">'
-                . '<p style="margin:0 0 8px; font-weight:600;">🚀 Instrucciones para R.E.X:</p>'
-                . '<p style="margin:0 0 12px; font-size:0.9rem;">Debes ingresar a <a href="https://royal-evolution-x.cl" style="color:#E10600; font-weight:700;">royal-evolution-x.cl</a> con tu cuenta para ver el bracket y reportar tus resultados el día del evento.</p>'
-                . ($registration->generated_user_id ? '<p style="margin:0; font-size:0.85rem; color:#94a3b8;">* Hemos creado tu usuario con el correo registrado y contraseña temporal: <strong>abcd1234</strong></p>' : '')
-                . '</div>'
-                . '<div style="margin-top:20px; padding:15px; background:rgba(255,255,255,0.03); border-radius:8px; border-left:4px solid #E10600;">'
-                . '<h4 style="margin:0 0 10px; color:#E10600; text-transform:uppercase; font-size:0.8rem;">Bases y Restricciones:</h4>'
-                . '<div style="font-size:0.85rem; line-height:1.5;">' . ($event->rules ? nl2br(htmlspecialchars($event->rules)) : 'Sin reglas específicas reportadas. Favor seguir el reglamento oficial de Guerrilla Xtrem.') . '</div>'
-                . '</div>'
-                . '<p style="margin-top:20px;">¡Nos vemos en la arena, Blader!</p>';
+        if (!empty($recipient)) {
+            // Send mail after response to avoid blocking admin UX.
+            app()->terminating(function () use ($recipient, $bladerName, $eventName, $eventRules, $generatedUserId) {
+                try {
+                    $body = '<p>¡Hola <strong>' . htmlspecialchars($bladerName) . '</strong>!</p>'
+                        . '<p>Tu pago ha sido validado y tu inscripción al torneo <strong>' . htmlspecialchars($eventName) . '</strong> está <strong style="color:#22c55e;">Confirmada</strong>.</p>'
+                        . '<div class="highlight-box">'
+                        . '<p style="margin:0 0 8px; font-weight:600;">🚀 Instrucciones para R.E.X:</p>'
+                        . '<p style="margin:0 0 12px; font-size:0.9rem;">Debes ingresar a <a href="https://royal-evolution-x.cl" style="color:#E10600; font-weight:700;">royal-evolution-x.cl</a> con tu cuenta para ver el bracket y reportar tus resultados el día del evento.</p>'
+                        . ($generatedUserId ? '<p style="margin:0; font-size:0.85rem; color:#94a3b8;">* Hemos creado tu usuario con el correo registrado y contraseña temporal: <strong>abcd1234</strong></p>' : '')
+                        . '</div>'
+                        . '<div style="margin-top:20px; padding:15px; background:rgba(255,255,255,0.03); border-radius:8px; border-left:4px solid #E10600;">'
+                        . '<h4 style="margin:0 0 10px; color:#E10600; text-transform:uppercase; font-size:0.8rem;">Bases y Restricciones:</h4>'
+                        . '<div style="font-size:0.85rem; line-height:1.5;">' . ($eventRules ? nl2br(htmlspecialchars($eventRules)) : 'Sin reglas específicas reportadas. Favor seguir el reglamento oficial de Guerrilla Xtrem.') . '</div>'
+                        . '</div>'
+                        . '<p style="margin-top:20px;">¡Nos vemos en la arena!</p>';
 
-            \Illuminate\Support\Facades\Mail::to($registration->email)->send(
-                new \App\Mail\GxStyledMail(
-                    subject: 'Inscripción Confirmada - ' . $event->name,
-                    heading: 'Inscripción Validada Correctamente',
-                    body: $body,
-                    ctaText: 'Ver R.E.X',
-                    ctaUrl: 'https://royal-evolution-x.cl',
-                )
-            );
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Failed to send tournament confirmation email: " . $e->getMessage());
+                    Mail::to($recipient)->send(
+                        new \App\Mail\GxStyledMail(
+                            subject: 'Inscripción Confirmada - ' . $eventName,
+                            heading: 'Inscripción Validada Correctamente',
+                            body: $body,
+                            ctaText: 'Ver R.E.X',
+                            ctaUrl: 'https://royal-evolution-x.cl',
+                        )
+                    );
+                } catch (\Throwable $e) {
+                    Log::error('Failed to send tournament confirmation email: ' . $e->getMessage());
+                }
+            });
         }
 
         AuditLogger::log('approve_tournament_registration', 'TournamentRegistration', $registration->id, [
@@ -317,7 +370,49 @@ class AdminLeagueController extends Controller
             'reason' => $validated['reason'],
         ]);
 
+        $event = $registration->event;
+        $eventName = $event?->name ?? 'Torneo GX';
+        $recipient = $registration->email;
+        $bladerName = $this->registrationDisplayName($registration);
+        $reason = $validated['reason'];
+
+        if (!empty($recipient)) {
+            app()->terminating(function () use ($recipient, $bladerName, $eventName, $reason) {
+                try {
+                    $body = '<p>Hola <strong>' . htmlspecialchars($bladerName) . '</strong>,</p>'
+                        . '<p>Tu preinscripción al torneo <strong>' . htmlspecialchars($eventName) . '</strong> fue <strong style="color:#ef4444;">rechazada</strong>.</p>'
+                        . '<div class="highlight-box">'
+                        . '<p style="margin:0 0 8px; font-weight:700;">Motivo:</p>'
+                        . '<p style="margin:0;">' . nl2br(htmlspecialchars($reason)) . '</p>'
+                        . '</div>'
+                        . '<p>Si necesitas ayuda, escríbenos por Instagram para revisar tu caso.</p>';
+
+                    Mail::to($recipient)->send(
+                        new \App\Mail\GxStyledMail(
+                            subject: 'Preinscripción Rechazada - ' . $eventName,
+                            heading: 'Estado de tu preinscripción',
+                            body: $body,
+                            ctaText: 'Contactar por Instagram',
+                            ctaUrl: 'https://instagram.com/guerrilla_xtrem',
+                        )
+                    );
+                } catch (\Throwable $e) {
+                    Log::error('Failed to send tournament rejection email: ' . $e->getMessage());
+                }
+            });
+        }
+
         return back()->with('warning', 'Inscripción rechazada.');
+    }
+
+    private function registrationDisplayName(TournamentRegistration $registration): string
+    {
+        if (!empty($registration->blader_name)) {
+            return $registration->blader_name;
+        }
+
+        $fullName = trim(($registration->first_name ?? '') . ' ' . ($registration->last_name ?? ''));
+        return $fullName !== '' ? $fullName : 'Blader';
     }
 
     public function updateTournamentRegistration(Request $request, TournamentRegistration $registration)
@@ -619,5 +714,3 @@ class AdminLeagueController extends Controller
         return back()->with('success', "{$name} añadido. " . count($newMatches) . " partidas nuevas generadas.");
     }
 }
-
-

@@ -49,9 +49,13 @@
           </div>
           
           <div class="promo-info-row mt-md mb-lg">
-            <div v-if="event.prizes" class="info-tag prizes">
+            <div
+              v-for="(prize, prizeIndex) in prizeLines(event.prizes)"
+              :key="`${event.id}-prize-${prizeIndex}`"
+              class="info-tag prizes"
+            >
               <span class="tag-icon">🏆</span>
-              <span class="tag-text">{{ event.prizes }}</span>
+              <span class="tag-text">{{ prize }}</span>
             </div>
             <div class="info-tag cost">
               <span class="tag-icon">💰</span>
@@ -60,7 +64,7 @@
               </span>
             </div>
           </div>
-          <Link :href="route('tournaments.register', event.id)" class="btn btn-glow-primary uppercase">Pre-Inscribirse Ahora</Link>
+          <Link :href="route('tournaments.register', event.id)" class="btn btn-glow-primary uppercase">Inscribirse Ahora</Link>
         </div>
       </section>
 
@@ -72,7 +76,13 @@
         </div>
 
         <div class="roster-grid">
-          <article v-for="member in teamMembers" :key="member.id" class="member-card" :class="{'has-flip': member.lock_chip_url}">
+          <article
+            v-for="member in teamMembers"
+            :key="member.id"
+            class="member-card"
+            :class="{ 'has-flip': member.lock_chip_url, 'is-flipped': isMemberFlipped(member.id) }"
+            @click="toggleMemberFlip(member, $event)"
+          >
             <div v-if="member.role_title" class="role-ribbon" :class="getRoleClass(member.role_title)">
               {{ member.role_title }}
             </div>
@@ -156,7 +166,7 @@
                 <a href="https://instagram.com/guerrilla_xtrem" target="_blank" class="icon-btn instagram" title="Instagram">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
                 </a>
-                <a href="https://tiktok.com/guerrilla_xtrem" target="_blank" class="icon-btn tiktok" title="TikTok">
+                <a href="https://www.tiktok.com/@gxtreme_beyblade" target="_blank" class="icon-btn tiktok" title="TikTok">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
                 </a>
                 <a href="https://chat.whatsapp.com/Kt6t6pmBxwFJc01iZn3hhs" target="_blank" class="icon-btn whatsapp" title="WhatsApp">
@@ -177,6 +187,7 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
@@ -198,6 +209,42 @@ function getRoleClass(role) {
 const handleImageError = (e) => {
   e.target.src = '/img/logo.png';
 };
+
+const flippedMemberIds = ref([]);
+
+const isMemberFlipped = (memberId) => flippedMemberIds.value.includes(memberId);
+
+const toggleMemberFlip = (member, event) => {
+  if (!member?.lock_chip_url) return;
+  if (event?.target?.closest?.('.member-socials')) return;
+
+  if (isMemberFlipped(member.id)) {
+    flippedMemberIds.value = flippedMemberIds.value.filter((id) => id !== member.id);
+    return;
+  }
+
+  flippedMemberIds.value = [...flippedMemberIds.value, member.id];
+};
+
+const prizeLines = (prizes) => {
+  if (!prizes) return [];
+  const normalized = String(prizes).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if (!normalized) return [];
+
+  const lines = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length > 1) return lines;
+
+  const fallbackLines = normalized
+    .split(/\s*(?:\||;|•|·|\/)\s*|\.\s+(?=[A-ZÁÉÍÓÚÑ0-9])/g)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return fallbackLines.length > 1 ? fallbackLines : [normalized];
+};
 </script>
 
 <style scoped>
@@ -208,8 +255,14 @@ const handleImageError = (e) => {
   height: 100%;
 }
 
-.member-card.has-flip:hover .flipper {
+.member-card.has-flip.is-flipped .flipper {
   transform: rotateY(180deg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .member-card.has-flip:hover .flipper {
+    transform: rotateY(180deg);
+  }
 }
 
 .flipper {
@@ -520,6 +573,10 @@ const handleImageError = (e) => {
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
+}
+
+.member-card.has-flip {
+  cursor: pointer;
 }
 
 .member-card:hover {
@@ -890,4 +947,3 @@ const handleImageError = (e) => {
   }
 }
 </style>
-

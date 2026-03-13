@@ -77,7 +77,7 @@
               <h3 class="section-title">¿Tienes cuenta en R.E.X?</h3>
               <p class="text-secondary mb-md italic text-sm">
                 REX es nuestra plataforma oficial de gestión de batallas y bladers. 
-                <button type="button" @click="showRexModal = true" class="text-gx-red font-bold hover:underline ml-1">¿Qué es R.E.X? →</button>
+                <button type="button" @click="showRexModal = true" class="rex-help-btn">¿Qué es R.E.X? →</button>
               </p>
               
               <div class="rex-options mb-lg">
@@ -114,6 +114,11 @@
                 </div>
                 <p class="text-xs text-secondary mt-xs">Asegúrate de que sea exactamente igual a tu nombre en R.E.X</p>
                 <span v-if="form.errors.blader_name" class="form-error">{{ form.errors.blader_name }}</span>
+                <div class="form-group mt-md">
+                  <label class="form-label">Correo electrónico *</label>
+                  <input type="email" v-model="form.email" class="form-input" placeholder="correo@ejemplo.com" required />
+                  <span v-if="form.errors.email" class="form-error">{{ form.errors.email }}</span>
+                </div>
               </div>
 
               <div v-else class="space-y-md">
@@ -210,6 +215,9 @@
                     <p class="payment-value italic">{{ event.payment_instructions }}</p>
                   </div>
                 </div>
+                <button type="button" class="btn btn-outline btn-sm copy-payment-btn" @click="copyPaymentData">
+                  Copiar todos los datos de la cuenta
+                </button>
 
                 <div class="proof-upload p-xl text-center border-2 border-dashed border-white/10 rounded-xl bg-white/5">
                   <input ref="proofInput" type="file" @change="onProofSelected" accept="image/*" class="sr-only" id="proof_file" />
@@ -217,7 +225,7 @@
                   <div v-if="!form.proof" class="space-y-sm">
                     <div class="text-3xl">📄</div>
                     <h3 class="font-bold">Sube tu comprobante *</h3>
-                    <p class="text-xs text-secondary">Imagen JPG, PNG o PDF (Máx 5MB)</p>
+                    <p class="text-xs text-secondary">Imagen JPG, PNG o WEBP (Máx 5MB)</p>
                     <button class="btn btn-secondary btn-sm mt-md" type="button" @click="triggerProofPicker">Seleccionar archivo</button>
                   </div>
 
@@ -283,12 +291,26 @@
         <button @click="showRexModal = false" class="btn btn-primary btn-block mt-xl">Entendido, Volver al registro</button>
       </div>
     </div>
+
+    <div v-if="showSuccessModal" class="modal-overlay" @click.self="closeSuccessModal">
+      <div class="modal-content card success-modal-card">
+        <div class="success-modal-icon">✅</div>
+        <h2 class="text-gradient success-modal-title">¡Gracias por inscribirte!</h2>
+        <p class="text-secondary text-center">
+          Te esperamos en el torneo. Tu registro fue enviado correctamente.
+        </p>
+        <p class="success-countdown">
+          Serás redirigido al inicio en <strong>{{ redirectCountdown }}</strong> segundos.
+        </p>
+        <button class="btn btn-primary btn-block mt-md" @click="closeSuccessModal">Cerrar</button>
+      </div>
+    </div>
   </AppLayout>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { useToast } from '@/Composables/useToast';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
@@ -305,6 +327,10 @@ const currentStep = ref(1);
 const isRex = computed(() => form.is_rex_registered === true);
 const proofInput = ref(null);
 const showRexModal = ref(false);
+const showSuccessModal = ref(false);
+const redirectCountdown = ref(30);
+let redirectInterval = null;
+let redirectTimeout = null;
 
 const form = useForm({
   first_name: '',
@@ -331,6 +357,15 @@ onMounted(() => {
     form.blader_name = user.blader_name || '';
     form.email = user.email || '';
   }
+});
+
+onUnmounted(() => {
+  clearPostRegisterTimers();
+  document.body.style.overflow = '';
+});
+
+watch([showRexModal, showSuccessModal], ([isRexOpen, isSuccessOpen]) => {
+  document.body.style.overflow = (isRexOpen || isSuccessOpen) ? 'hidden' : '';
 });
 
 const validateStep = () => {
@@ -366,6 +401,82 @@ const onProofSelected = (e) => {
 const removeProof = () => {
   form.proof = null;
   if (proofInput.value) proofInput.value.value = '';
+};
+
+const copyPaymentData = async () => {
+  const amount = new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(props.event.registration_cost || 0);
+
+  const lines = [
+    `Banco: ${props.event.bank_name || 'Banco Estado'}`,
+    `Titular: ${props.event.account_holder || 'Daniel Orellana'}`,
+    `Tipo de cuenta: ${props.event.account_type || 'Cuenta Vista / Rut'}`,
+    `Numero de cuenta: ${props.event.account_number || '20539169'}`,
+    `Email: ${props.event.account_email || 'ventas@gxbeyblade.com'}`,
+    `Monto torneo: ${amount}`,
+  ];
+
+  if (props.event.payment_instructions) {
+    lines.push(`Instrucciones: ${props.event.payment_instructions}`);
+  }
+
+  const text = lines.join('\n');
+
+  try {
+    await navigator.clipboard.writeText(text);
+    toastSuccess('Datos de pago copiados al portapapeles.');
+  } catch (error) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    toastSuccess('Datos de pago copiados al portapapeles.');
+  }
+};
+
+const clearPostRegisterTimers = () => {
+  if (redirectInterval) {
+    clearInterval(redirectInterval);
+    redirectInterval = null;
+  }
+  if (redirectTimeout) {
+    clearTimeout(redirectTimeout);
+    redirectTimeout = null;
+  }
+};
+
+const closeSuccessModal = () => {
+  clearPostRegisterTimers();
+  showSuccessModal.value = false;
+  router.visit(route('home'));
+};
+
+const startPostRegisterCountdown = () => {
+  clearPostRegisterTimers();
+  redirectCountdown.value = 30;
+  showSuccessModal.value = true;
+
+  redirectInterval = setInterval(() => {
+    if (redirectCountdown.value > 1) {
+      redirectCountdown.value -= 1;
+      return;
+    }
+    clearPostRegisterTimers();
+    closeSuccessModal();
+  }, 1000);
+
+  redirectTimeout = setTimeout(() => {
+    clearPostRegisterTimers();
+    closeSuccessModal();
+  }, 30000);
 };
 
 const nextStep = () => {
@@ -409,12 +520,14 @@ const submit = () => {
       is_rex_registered: data.is_rex_registered ? 1 : 0,
     }))
     .post(route('tournaments.register.store', props.event.id), {
+      forceFormData: true,
       preserveScroll: true,
       preserveState: true,
       onSuccess: () => {
-        toastSuccess('Pre-registro confirmado correctamente.');
         currentStep.value = 1;
         form.reset();
+        toastSuccess('Pre-registro confirmado correctamente.');
+        startPostRegisterCountdown();
       },
       onError: (errors) => {
         const firstError = Object.values(errors || {})[0];
@@ -554,6 +667,21 @@ const submit = () => {
   border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
+.rex-help-btn {
+  margin-left: 6px;
+  color: var(--gx-red-light);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.rex-help-btn:hover {
+  color: #fff;
+}
+
 .rex-options button {
   color: white !important;
 }
@@ -603,6 +731,59 @@ const submit = () => {
   font-size: 0.9rem;
 }
 
+.copy-payment-btn {
+  margin-bottom: var(--space-md);
+  width: 100%;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
+}
+
+.modal-content {
+  width: min(680px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.success-modal-card {
+  max-width: 520px;
+  display: grid;
+  gap: var(--space-sm);
+  justify-items: center;
+}
+
+.success-modal-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  font-size: 1.8rem;
+}
+
+.success-modal-title {
+  margin: 0;
+  text-align: center;
+}
+
+.success-countdown {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 @media (max-width: 700px) {
   .event-grid,
   .rex-options,
@@ -619,5 +800,3 @@ const submit = () => {
   }
 }
 </style>
-
-

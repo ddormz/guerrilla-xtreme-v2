@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Mail\GxStyledMail;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -54,6 +56,31 @@ class User extends Authenticatable
         return $this->role->isMember();
     }
 
+    public function sendPasswordResetNotification($token): void
+    {
+        $url = url(route('password.reset', [
+            'token' => $token,
+            'email' => $this->email,
+        ], false));
+
+        $body = '<p>Hola <strong>' . htmlspecialchars($this->blader_name ?: $this->name) . '</strong>,</p>'
+            . '<p>Recibimos una solicitud para restablecer tu contraseña.</p>'
+            . '<div class="highlight-box">'
+            . '<p style="margin:0;">Si no solicitaste este cambio, puedes ignorar este correo.</p>'
+            . '</div>'
+            . '<p>Este enlace expirará en 60 minutos.</p>';
+
+        Mail::to($this->email)->send(
+            new GxStyledMail(
+                subject: 'Restablece tu contraseña - Guerrilla Xtrem',
+                heading: 'Recuperación de contraseña',
+                body: $body,
+                ctaText: 'Restablecer contraseña',
+                ctaUrl: $url,
+            )
+        );
+    }
+
     // ----- Relationships -----
     public function leaguePlayer(): HasOne
     {
@@ -80,4 +107,3 @@ class User extends Authenticatable
         return $this->hasMany(AuditLog::class, 'actor_user_id');
     }
 }
-

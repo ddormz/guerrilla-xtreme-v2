@@ -3,8 +3,10 @@
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminLeagueController;
 use App\Http\Controllers\Admin\AdminRaffleController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeagueController;
@@ -33,6 +35,10 @@ Route::middleware('guest')->group(function () {
     Route::post('login', [LoginController::class, 'store']);
     Route::get('registro', [RegisterController::class, 'create'])->name('register');
     Route::post('registro', [RegisterController::class, 'store']);
+    Route::get('forgot-password', [ForgotPasswordController::class, 'create'])->name('password.request');
+    Route::post('forgot-password', [ForgotPasswordController::class, 'store'])->name('password.email');
+    Route::get('reset-password/{token}', [ResetPasswordController::class, 'create'])->name('password.reset');
+    Route::post('reset-password', [ResetPasswordController::class, 'store'])->name('password.store');
 });
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
@@ -136,4 +142,3 @@ Route::middleware('auth')->group(function () {
     Route::post('rifas/{raffle}/reservar', [RaffleController::class, 'reserve'])->name('raffles.reserve');
     Route::get('dashboard', fn () => redirect()->route('home'))->name('dashboard');
 });
-

@@ -31,7 +31,15 @@
               </p>
               <div v-if="event.prizes" class="mt-sm p-sm bg-black/20 rounded border border-white/5">
                 <div class="text-xs uppercase tracking-wider text-gold font-bold mb-xs">🎁 Premios</div>
-                <div class="text-sm text-secondary">{{ event.prizes }}</div>
+                <ul class="prize-list">
+                  <li
+                    v-for="(prize, prizeIndex) in prizeLines(event.prizes)"
+                    :key="`${event.id}-prize-${prizeIndex}`"
+                    class="prize-badge"
+                  >
+                    {{ prize }}
+                  </li>
+                </ul>
               </div>
               <div v-if="event.description" class="text-sm text-secondary mt-sm line-clamp-2 max-w-2xl">
                 {{ event.description }}
@@ -39,7 +47,7 @@
             </div>
             <div class="event-actions flex flex-col gap-sm">
               <Link :href="route('tournaments.register', event.id)" class="btn btn-primary" v-if="event.type === 'torneo'">
-                Pre-registrar
+                Inscribirse
               </Link>
               <Link v-if="event.is_live" href="/live" class="btn btn-outline btn-sm">
                 Ver Live
@@ -97,6 +105,26 @@ const parseDate = (dateStr) => {
   const [datePart, timePart] = dateStr.split(' ');
   const [d, m, y] = datePart.split('/');
   return new Date(`${y}-${m}-${d}T${timePart || '00:00'}`);
+};
+
+const prizeLines = (prizes) => {
+  if (!prizes) return [];
+  const normalized = String(prizes).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if (!normalized) return [];
+
+  const lines = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length > 1) return lines;
+
+  const fallbackLines = normalized
+    .split(/\s*(?:\||;|•|·|\/)\s*|\.\s+(?=[A-ZÁÉÍÓÚÑ0-9])/g)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return fallbackLines.length > 1 ? fallbackLines : [normalized];
 };
 </script>
 
@@ -181,6 +209,32 @@ const parseDate = (dateStr) => {
 
 .event-actions {
   flex-shrink: 0;
+}
+
+.prize-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+}
+
+.prize-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.08);
+  color: #facc15;
+  font-size: 0.8rem;
+  line-height: 1.25;
+}
+
+.prize-badge::before {
+  content: '🏆';
 }
 
 @media (max-width: 768px) {

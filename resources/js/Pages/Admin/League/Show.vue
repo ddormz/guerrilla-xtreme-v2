@@ -304,8 +304,8 @@
       </div>
     </div>
     <!-- Modal: Asignar Árbitros en Masa -->
-    <div v-if="showRefModal" class="fixed inset-0 z-50 flex items-center justify-center p-md bg-black/80 backdrop-blur-sm">
-      <div class="bg-surface border border-white/10 rounded-2xl p-lg w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
+    <div v-if="showRefModal" class="event-modal-overlay" @click.self="showRefModal = false">
+      <div class="event-modal-panel event-modal-sm">
         <button @click="showRefModal = false" class="absolute top-md right-md text-secondary hover:text-white transition-colors">
           <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
@@ -330,8 +330,8 @@
     </div>
 
     <!-- Modal: Revisar Registro de Torneo -->
-    <div v-if="showReviewModal" class="fixed inset-0 z-50 flex items-center justify-center p-md bg-black/80 backdrop-blur-sm">
-      <div class="bg-surface border border-white/10 rounded-2xl p-lg w-full max-w-2xl shadow-2xl relative animate-in fade-in zoom-in duration-200">
+    <div v-if="showReviewModal" class="event-modal-overlay" @click.self="closeReviewModal">
+      <div class="event-modal-panel event-modal-lg">
         <button @click="closeReviewModal" class="absolute top-md right-md text-secondary hover:text-white transition-colors">
           <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
@@ -394,14 +394,14 @@
       </div>
     </div>
     
-    <div v-if="showFullProof" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-xl" @click="showFullProof = false">
+    <div v-if="showFullProof" class="proof-lightbox" @click="showFullProof = false">
       <img :src="fullProofUrl" class="max-w-full max-h-full object-contain shadow-2xl animate-in zoom-in duration-300" />
       <button class="absolute top-md right-md text-white/50 hover:text-white text-4xl">&times;</button>
     </div>
 
     <!-- Modal: Editar Registro -->
-    <div v-if="showEditRegModal" class="fixed inset-0 z-50 flex items-center justify-center p-md bg-black/80 backdrop-blur-sm">
-      <div class="bg-surface border border-white/10 rounded-2xl p-lg w-full max-w-md shadow-2xl relative">
+    <div v-if="showEditRegModal" class="event-modal-overlay" @click.self="showEditRegModal = false">
+      <div class="event-modal-panel event-modal-sm">
         <h3 class="text-xl font-display font-black mb-md text-white">Editar Preinscripción</h3>
         <form @submit.prevent="submitEditReg" class="space-y-md">
           <div class="form-group font-bold">
@@ -1017,9 +1017,9 @@ const handleImageError = (e) => {
   gap: 6px;
 }
 .filter-pill:hover, .filter-pill.active {
-  background: var(--gx-blue);
+  background: var(--accent-blue);
   color: white;
-  border-color: var(--gx-blue);
+  border-color: var(--accent-blue);
 }
 .badge-sm {
   background: rgba(0,0,0,0.3);
@@ -1065,7 +1065,63 @@ const handleImageError = (e) => {
     filter: grayscale(1);
 }
 
+.event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 30);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.event-modal-panel {
+  width: min(100%, 960px);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.event-modal-sm {
+  max-width: 520px;
+}
+
+.event-modal-lg {
+  max-width: 980px;
+}
+
+.proof-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 40);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.95);
+  padding: var(--space-lg);
+}
+
+.admin-event-show .gx-table th,
+.admin-event-show .gx-table td {
+  white-space: nowrap;
+}
+
+.admin-event-show .gx-table td {
+  font-size: 0.82rem;
+}
+
+@media (max-width: 960px) {
+  .admin-event-show .gx-table th,
+  .admin-event-show .gx-table td {
+    white-space: normal;
+  }
+}
+
 </style>
-
-
 

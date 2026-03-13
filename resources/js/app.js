@@ -5,6 +5,7 @@ import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import { registerSW } from 'virtual:pwa-register';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Guerrilla Xtreme';
 
@@ -26,6 +27,18 @@ createInertiaApp({
         showSpinner: true,
     },
 });
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    const updateSW = registerSW({
+        immediate: true,
+        onNeedRefresh() {
+            updateSW(true);
+        },
+        onRegisterError(error) {
+            console.error('Service worker registration failed:', error);
+        },
+    });
+}
 
 window.addEventListener('error', function (e) {
     if (e.target.tagName === 'IMG') {

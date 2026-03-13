@@ -70,7 +70,7 @@ class AdminMemberController extends Controller
             'display_order' => 'required|integer|min:0',
             'is_active' => 'boolean',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
-            'lock_chip_photo' => 'nullable|image|mimes:png,webp|max:10240',
+            'lock_chip_photo' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:10240',
         ]);
 
         if ($request->hasFile('photo')) {

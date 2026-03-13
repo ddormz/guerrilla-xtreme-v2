@@ -8,6 +8,13 @@
         <p class="text-secondary">Participa y apoya a la comunidad para ganar increíbles premios.</p>
       </div>
 
+      <div class="raffles-warning card mb-lg">
+        <p>
+          Esta sección se encuentra en reconstrucción, pronto se publicarán las fotos de los ganadores anteriores,
+          ante cualquier duda, pueden revisar nuestro instagram o hablarnos al dm.
+        </p>
+      </div>
+
       <div v-if="raffles.length > 0" class="raffles-grid stagger">
         <div v-for="raffle in raffles" :key="raffle.id" class="raffle-card card card-hover">
           <div class="raffle-status-badge">
@@ -75,6 +82,18 @@ const formatPrice = (price) => {
 </script>
 
 <style scoped>
+.raffles-warning {
+  border-left: 4px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  color: #fde68a;
+}
+
+.raffles-warning p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
 .raffles-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

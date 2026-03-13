@@ -57,6 +57,23 @@
             line-height: 1.6;
             margin: 0 0 14px;
         }
+        .email-body ul,
+        .email-body ol {
+            margin: 0 0 14px;
+            padding-left: 18px;
+            color: #b0b0b0 !important;
+        }
+        .email-body li {
+            color: #b0b0b0 !important;
+            line-height: 1.6;
+            margin-bottom: 6px;
+        }
+        .email-body strong {
+            color: #f3f4f6 !important;
+        }
+        .email-body a {
+            color: #E10600 !important;
+        }
         .cta-button {
             display: inline-block;
             background: #E10600;
@@ -89,12 +106,33 @@
             padding: 16px;
             margin: 16px 0;
         }
+        .highlight-box p,
+        .highlight-box ul,
+        .highlight-box ol,
+        .highlight-box li {
+            color: #d1d5db !important;
+        }
     </style>
 </head>
 <body>
+    @php
+        $logoPath = public_path('img/logo.png');
+        $logoEmbedded = null;
+
+        if (isset($message) && file_exists($logoPath)) {
+            try {
+                $logoEmbedded = $message->embed($logoPath);
+            } catch (\Throwable $e) {
+                $logoEmbedded = null;
+            }
+        }
+
+        $logoSrc = $logoEmbedded ?: rtrim(config('app.url'), '/') . '/img/logo.png';
+    @endphp
+
     <div class="email-wrapper">
         <div class="email-header">
-            <img src="{{ config('app.url') }}/img/logo.png" alt="GX" />
+            <img src="{{ $logoSrc }}" alt="GX" />
             <h1><span class="brand-red">GUERRILLA</span> XTREM</h1>
         </div>
 

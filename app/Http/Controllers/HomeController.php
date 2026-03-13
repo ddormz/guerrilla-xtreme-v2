@@ -11,20 +11,19 @@ class HomeController extends Controller
     public function index(): Response
     {
         $members = TeamMember::active()
-            ->with(['user'])
-            ->leftJoin('users', 'team_members.user_id', '=', 'users.id')
-            ->select('team_members.*')
-            // If they are linked to a user, filter by role. If not (managed bladers), show them anyway.
-            // Relaxed filter: show all active team members. The join is for supplementary info.
-            // The previous filter was:
-            // ->where(function ($query) {
-            //     $query->whereNull('team_members.user_id')
-            //           ->orWhereIn('users.role', [
-            //               \App\Enums\UserRole::MiembroGx->value,
-            //               \App\Enums\UserRole::Admin->value,
-            //               \App\Enums\UserRole::ArbitroGx->value
-            //           ]);
-            // })
+            ->select([
+                'id',
+                'name',
+                'blader_name',
+                'role_title',
+                'photo_path',
+                'lock_chip_photo',
+                'instagram',
+                'tiktok',
+                'joined_date',
+                'created_at',
+            ])
+            ->orderBy('display_order')
             ->get()
             ->map(fn ($m) => [
             'id' => $m->id,
@@ -42,6 +41,7 @@ class HomeController extends Controller
 
         $featuredEvents = \App\Models\LeagueEvent::where('show_on_index', true)
             ->where('event_date', '>=', now())
+            ->select(['id', 'name', 'event_date', 'time', 'location', 'prizes', 'registration_cost'])
             ->orderBy('event_date', 'asc')
             ->take(2)
             ->get();

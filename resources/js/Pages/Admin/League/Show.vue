@@ -182,9 +182,9 @@
 
         <div class="lg:col-span-2 space-y-xl">
           <section class="card p-md md:p-lg border-white/5">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-md gap-md">
+            <div class="section-bar flex flex-col md:flex-row justify-between items-start md:items-center mb-md gap-md">
               <div>
-                <h2 class="text-lg font-black flex items-center gap-xs">⚔️ Matches del Evento <span class="badge badge-blue ml-xs">{{ cAll }}</span></h2>
+                <h2 class="text-lg font-black flex items-center gap-xs">⚔️ Matches del Evento <span class="count">{{ cAll }}</span></h2>
                 <p class="text-[10px] text-secondary uppercase font-bold tracking-widest mt-xs">{{ presentCount }} jugadores listos</p>
               </div>
               <div class="flex gap-sm w-full md:w-auto flex-wrap">
@@ -209,11 +209,11 @@
             </div>
 
             <!-- Filters -->
-            <div class="flex flex-wrap gap-sm mb-md pb-md border-b border-white/10">
-              <button @click="statusFilter = 'all'" :class="['filter-pill', statusFilter === 'all' ? 'active' : '']">Todos <span class="badge-sm">{{ cAll }}</span></button>
-              <button @click="statusFilter = 'pending'" :class="['filter-pill', statusFilter === 'pending' ? 'active' : '']">⏳ Pendientes <span class="badge-sm">{{ cPend }}</span></button>
-              <button @click="statusFilter = 'finished'" :class="['filter-pill', statusFilter === 'finished' ? 'active' : '']">✓ Finalizados <span class="badge-sm">{{ cDone }}</span></button>
-              <button @click="statusFilter = 'no_ref'" :class="['filter-pill', statusFilter === 'no_ref' ? 'active' : '']">🚫 Sin Árbitro <span class="badge-sm">{{ cNoRef }}</span></button>
+            <div class="filter-pills">
+              <button @click="statusFilter = 'all'" :class="['fpill', statusFilter === 'all' ? 'active' : '']">Todos <span class="badge">{{ cAll }}</span></button>
+              <button @click="statusFilter = 'pending'" :class="['fpill', statusFilter === 'pending' ? 'active' : '']">⏳ Pendientes <span class="badge">{{ cPend }}</span></button>
+              <button @click="statusFilter = 'finished'" :class="['fpill', statusFilter === 'finished' ? 'active' : '']">✓ Finalizados <span class="badge">{{ cDone }}</span></button>
+              <button @click="statusFilter = 'no_ref'" :class="['fpill', statusFilter === 'no_ref' ? 'active' : '']">🚫 Sin Árbitro <span class="badge">{{ cNoRef }}</span></button>
             </div>
             
             <div class="mb-md">
@@ -221,55 +221,58 @@
             </div>
 
             <div v-if="filteredMatches && filteredMatches.length > 0" class="match-grid">
-              <div v-for="(m, index) in filteredMatches" :key="m.id" :class="['mc', m.concluded ? 'mc-done' : '']">
+              <div v-for="m in filteredMatches" :key="m.id" :class="['mc', m.concluded ? 'mc-done' : '']">
                 <div class="mc-top">
-                  <span class="mc-round text-xs font-bold text-secondary">R{{ m.round_no || 1 }} · #{{ index + 1 }}</span>
-                  <span v-if="m.concluded" class="pill pill-done px-xs py-[2px] rounded text-[10px] font-black tracking-wider uppercase bg-gx-success/20 text-gx-success border border-gx-success/30">✓ Finalizado</span>
-                  <span v-else-if="!m.referee_user_id" class="pill pill-noref px-xs py-[2px] rounded text-[10px] font-black tracking-wider uppercase bg-gx-red/20 text-gx-red border border-gx-red/30">Sin Árbitro</span>
-                  <span v-else class="pill pill-pending px-xs py-[2px] rounded text-[10px] font-black tracking-wider uppercase bg-gx-amber/20 text-gx-amber border border-gx-amber/30">⏳ Pendiente</span>
+                  <span class="mc-round">R{{ m.round_no || 1 }} · #{{ m.id }}</span>
+                  <span v-if="m.concluded" class="pill pill-done">✓ Finalizado</span>
+                  <span v-else-if="!m.referee_user_id" class="pill pill-noref">Sin Árbitro</span>
+                  <span v-else class="pill pill-pending">⏳ Pendiente</span>
                 </div>
                 
-                <div class="mc-players mt-sm flex justify-between items-center bg-black/30 rounded-lg p-sm border border-white/5">
-                  <div class="mc-player flex flex-col items-center flex-1 text-center" :class="[(m.concluded && m.winner_id === m.player_a_id) ? 'mc-winner' : (m.concluded ? 'mc-loser' : '')]">
-                    <div class="w-12 h-12 rounded-full overflow-hidden border-2 mb-xs" :class="(m.concluded && m.winner_id === m.player_a_id) ? 'border-gx-success' : 'border-white/10'">
-                      <img v-if="playerAvatar(m.player_a_id)" :src="playerAvatar(m.player_a_id)" class="w-full h-full object-cover" @error="handleImageError">
-                      <div v-else class="w-full h-full bg-white/10 flex items-center justify-center font-bold">{{ (m.player_a?.blader_name || 'A').charAt(0) }}</div>
-                    </div>
-                    <span class="text-xs font-bold leading-tight" :class="{'text-gx-success': m.concluded && m.winner_id === m.player_a_id}">{{ m.player_a?.blader_name || '-' }}</span>
+                <div class="mc-players">
+                  <div class="mc-player" :class="[(m.concluded && m.winner_id === m.player_a_id) ? 'mc-winner' : (m.concluded ? 'mc-loser' : '')]">
+                    <img v-if="playerAvatar(m.player_a_id)" :src="playerAvatar(m.player_a_id)" class="mc-avatar" @error="handleImageError">
+                    <div v-else class="mc-avatar placeholder">{{ (m.player_a?.blader_name || 'A').charAt(0) }}</div>
+                    <span class="mc-name">{{ m.player_a?.blader_name || '-' }}</span>
                   </div>
                   
-                  <div class="mc-vs flex flex-col items-center px-sm gap-xs shrink-0">
-                    <span class="text-lg font-display text-white" :class="{'text-gx-success': m.concluded && m.winner_id === m.player_a_id}">{{ m.score_a }}</span>
-                    <span class="text-[10px] font-black text-secondary tracking-widest uppercase bg-white/5 px-2 py-1 rounded-full border border-white/10">VS</span>
-                    <span class="text-lg font-display text-white" :class="{'text-gx-success': m.concluded && m.winner_id === m.player_b_id}">{{ m.score_b }}</span>
+                  <div class="mc-vs">
+                    <span class="mc-score">{{ m.score_a }}</span>
+                    <span class="mc-vs-label">VS</span>
+                    <span class="mc-score">{{ m.score_b }}</span>
                   </div>
                   
-                  <div class="mc-player flex flex-col items-center flex-1 text-center" :class="[(m.concluded && m.winner_id === m.player_b_id) ? 'mc-winner' : (m.concluded ? 'mc-loser' : '')]">
-                    <div class="w-12 h-12 rounded-full overflow-hidden border-2 mb-xs" :class="(m.concluded && m.winner_id === m.player_b_id) ? 'border-gx-success' : 'border-white/10'">
-                      <img v-if="playerAvatar(m.player_b_id)" :src="playerAvatar(m.player_b_id)" class="w-full h-full object-cover" @error="handleImageError">
-                      <div v-else class="w-full h-full bg-white/10 flex items-center justify-center font-bold">{{ (m.player_b?.blader_name || 'B').charAt(0) }}</div>
-                    </div>
-                    <span class="text-xs font-bold leading-tight" :class="{'text-gx-success': m.concluded && m.winner_id === m.player_b_id}">{{ m.player_b?.blader_name || '-' }}</span>
+                  <div class="mc-player" :class="[(m.concluded && m.winner_id === m.player_b_id) ? 'mc-winner' : (m.concluded ? 'mc-loser' : '')]">
+                    <img v-if="playerAvatar(m.player_b_id)" :src="playerAvatar(m.player_b_id)" class="mc-avatar" @error="handleImageError">
+                    <div v-else class="mc-avatar placeholder">{{ (m.player_b?.blader_name || 'B').charAt(0) }}</div>
+                    <span class="mc-name">{{ m.player_b?.blader_name || '-' }}</span>
                   </div>
                 </div>
 
-                <div class="mc-ref mt-sm flex items-center gap-sm bg-white/5 p-xs rounded border border-white/5 text-xs">
-                  <span class="opacity-70">🧑‍⚖️</span>
-                  <select v-if="!m.concluded" @change="handleAssignReferee(m.id, $event.target.value)" class="bg-transparent border-none text-xs p-0 focus:ring-0 outline-none w-full max-w-[150px]">
-                    <option value="">Sin asignar</option>
-                    <option v-for="ref in referees" :key="ref.id" :value="ref.id" :selected="m.referee_user_id === ref.id">{{ ref.blader_name || ref.name }}</option>
-                  </select>
-                  <span v-else class="text-secondary truncate grow">{{ m.referee?.blader_name || m.referee?.name || 'Arbitro' }}</span>
+                <div class="mc-ref">
+                  🧑‍⚖️
+                  <template v-if="m.referee_user_id">
+                    {{ m.referee?.blader_name || m.referee?.name || 'Árbitro' }}
+                  </template>
+                  <span v-else class="text-gx-red">Sin asignar</span>
                   
-                  <span v-if="m.winner_id" class="ml-auto text-gx-success font-bold flex items-center gap-xs"><span class="opacity-80">🏆</span> {{ m.winner_id === m.player_a_id ? (m.player_a?.blader_name) : (m.player_b?.blader_name) }}</span>
+                  <span v-if="m.winner_id" class="winner-tag">🏆 {{ m.winner_id === m.player_a_id ? (m.player_a?.blader_name) : (m.player_b?.blader_name) }}</span>
                 </div>
 
-                <div class="mc-actions mt-sm flex gap-xs">
-                  <Link :href="route('referee.match.panel', m.id)" class="btn btn-primary btn-xs flex-1 text-[10px] tracking-wider font-bold">
+                <div class="mc-actions">
+                  <Link :href="route('referee.match.panel', m.id)" class="btn btn-primary btn-xs flex-1">
                     {{ m.concluded ? '👁️ Ver' : '🎯 Arbitrar' }}
                   </Link>
-                  <button v-if="m.concluded" @click="resetMatch(m.id)" class="btn btn-outline btn-xs !border-accent-blue/30 !text-accent-blue hover:!bg-accent-blue/20" title="Reiniciar Partida" type="button">🔄</button>
-                  <button @click="deleteMatch(m.id)" class="btn btn-outline btn-xs !border-gx-red/30 !text-gx-red hover:!bg-gx-red/20" title="Eliminar Cruze" type="button">🗑️</button>
+                  <button
+                    v-if="!m.referee_user_id && !m.concluded"
+                    @click="openAssignRefereeModal(m)"
+                    class="btn btn-secondary btn-xs"
+                    type="button"
+                  >
+                    Asignar
+                  </button>
+                  <button v-if="m.concluded" @click="resetMatch(m.id)" class="btn btn-secondary btn-xs text-accent-blue border-accent-blue/30" title="Reiniciar Partida" type="button">🔄</button>
+                  <button @click="deleteMatch(m.id)" class="btn btn-secondary btn-xs text-gx-red border-gx-red/30" title="Eliminar Cruze" type="button">🗑️</button>
                 </div>
               </div>
             </div>
@@ -303,6 +306,29 @@
         </div>
       </div>
     </div>
+    <!-- Modal: Asignar Árbitro -->
+    <div v-if="showAssignRefModal" class="event-modal-overlay" @click.self="closeAssignRefereeModal">
+      <div class="event-modal-panel event-modal-sm">
+        <h3 class="text-xl font-display font-black mb-md text-white">Asignar Árbitro</h3>
+        <form @submit.prevent="submitAssignReferee" class="space-y-md">
+          <div class="form-group">
+            <label class="form-label">Árbitro</label>
+            <select v-model="assignRefereeId" class="form-input" required>
+              <option value="">-- Selecciona --</option>
+              <option v-for="ref in referees" :key="ref.id" :value="String(ref.id)">
+                {{ ref.blader_name || ref.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="flex gap-sm mt-lg">
+            <button type="button" @click="closeAssignRefereeModal" class="btn btn-ghost flex-1">Cancelar</button>
+            <button type="submit" class="btn btn-primary flex-1">Asignar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Modal: Asignar Árbitros en Masa -->
     <div v-if="showRefModal" class="event-modal-overlay" @click.self="showRefModal = false">
       <div class="event-modal-panel event-modal-sm">
@@ -649,12 +675,39 @@ const addLatePlayer = async () => {
   });
 };
 
-const handleAssignReferee = (matchId, refereeId) => {
+const showAssignRefModal = ref(false);
+const assignRefMatchId = ref(null);
+const assignRefereeId = ref('');
+
+const openAssignRefereeModal = (match) => {
+  assignRefMatchId.value = match.id;
+  assignRefereeId.value = match.referee_user_id ? String(match.referee_user_id) : '';
+  showAssignRefModal.value = true;
+};
+
+const closeAssignRefereeModal = () => {
+  showAssignRefModal.value = false;
+  assignRefMatchId.value = null;
+  assignRefereeId.value = '';
+};
+
+const submitAssignReferee = () => {
+  if (!assignRefMatchId.value || !assignRefereeId.value) return;
+
+  handleAssignReferee(assignRefMatchId.value, assignRefereeId.value, {
+    onSuccess: () => closeAssignRefereeModal(),
+  });
+};
+
+const handleAssignReferee = (matchId, refereeId, options = {}) => {
   router.post(route('admin.events.matches.referee', { match: matchId }), {
     referee_id: refereeId || null,
   }, {
     preserveScroll: true,
-    onSuccess: () => toastSuccess('Árbitro asignado.'),
+    onSuccess: () => {
+      toastSuccess('Árbitro asignado.');
+      options.onSuccess?.();
+    },
   });
 };
 
@@ -1002,67 +1055,246 @@ const handleImageError = (e) => {
   color: var(--gx-red);
 }
 
-.filter-pill {
-  padding: 6px 14px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
+.section-bar {
   display: flex;
   align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-bar h2 {
+  margin: 0;
+}
+
+.section-bar .count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.filter-pills {
+  display: flex;
   gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0;
+  margin-bottom: 14px;
 }
-.filter-pill:hover, .filter-pill.active {
-  background: var(--accent-blue);
-  color: white;
-  border-color: var(--accent-blue);
+
+.fpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.2s;
 }
-.badge-sm {
-  background: rgba(0,0,0,0.3);
-  padding: 2px 6px;
+
+.fpill:hover {
+  border-color: var(--gx-red);
+  color: #fff;
+}
+
+.fpill.active {
+  background: linear-gradient(135deg, var(--gx-red), #9e1b1b);
+  color: #fff;
+  border-color: var(--gx-red);
+}
+
+.fpill .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
   border-radius: 10px;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 0 5px;
 }
 
 .match-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 920px) {
+  .match-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .mc {
-    background: rgba(0,0,0,0.2);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    transition: all 0.2s ease;
+  background: rgba(20, 20, 20, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  padding: 16px;
+  transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .mc:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  border-color: rgba(225, 6, 0, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 26px rgba(225, 6, 0, 0.12);
 }
 
-.mc-done {
-    background: rgba(74, 222, 128, 0.03); 
-    border-color: rgba(74, 222, 128, 0.15);
+.mc.mc-done {
+  opacity: 0.78;
+  border-color: rgba(16, 185, 129, 0.35);
 }
 
 .mc-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.mc-round {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gx-red);
+}
+
+.mc-players {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mc-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mc-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+}
+
+.mc-avatar.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-weight: 700;
+}
+
+.mc-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.mc-vs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.mc-score {
+  font-size: 1.5rem;
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+}
+
+.mc-vs-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.mc-winner .mc-name {
+  color: #4ade80;
+}
+
+.mc-winner .mc-avatar {
+  border-color: #4ade80;
 }
 
 .mc-loser {
-    opacity: 0.5;
-    filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pill-pending {
+  background: rgba(250, 204, 21, 0.2);
+  color: #facc15;
+}
+
+.pill-done {
+  background: rgba(16, 185, 129, 0.2);
+  color: #4ade80;
+}
+
+.pill-noref {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+}
+
+.mc-ref {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.winner-tag {
+  margin-left: auto;
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.mc-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .event-modal-overlay {
@@ -1124,4 +1356,3 @@ const handleImageError = (e) => {
 }
 
 </style>
-

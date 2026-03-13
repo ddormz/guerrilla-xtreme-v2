@@ -19,7 +19,18 @@ class AdminRaffleController extends Controller
 {
     public function index(): Response
     {
-        $raffles = Raffle::withCount('numbers')->orderBy('created_at', 'desc')->get();
+        $raffles = Raffle::query()
+            ->withCount([
+                'numbers',
+                'numbers as sold_numbers_count' => fn ($q) => $q->whereIn('status', [
+                    RaffleNumberStatus::Sold->value,
+                    RaffleNumberStatus::Winner->value,
+                ]),
+                'numbers as reserved_numbers_count' => fn ($q) => $q->where('status', RaffleNumberStatus::Reserved->value),
+                'reservations as pending_reservations_count' => fn ($q) => $q->where('status', 'reserved'),
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         $mapReservation = fn (RaffleReservation $reservation) => [
             'id' => $reservation->id,
@@ -86,9 +97,39 @@ class AdminRaffleController extends Controller
             ];
         });
 
+        $reservations = $raffle->reservations()
+            ->with('numbers')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (RaffleReservation $reservation) {
+                return [
+                    'id' => $reservation->id,
+                    'buyer_name' => $reservation->buyer_name,
+                    'blader_name' => $reservation->blader_name,
+                    'email' => $reservation->email,
+                    'phone' => $reservation->phone,
+                    'status' => $reservation->status,
+                    'total_amount' => $reservation->total_amount,
+                    'proof_url' => $reservation->proof_path ? Storage::url($reservation->proof_path) : null,
+                    'created_at' => $reservation->created_at?->toDateTimeString(),
+                    'validated_at' => $reservation->validated_at?->toDateTimeString(),
+                    'numbers' => $reservation->numbers->pluck('number')->sort()->values(),
+                ];
+            });
+
+        $prizeItems = $raffle->prizes->map(fn ($prize) => [
+            'id' => $prize->id,
+            'position' => $prize->position,
+            'title' => $prize->title,
+            'description' => $prize->description,
+            'image_url' => $prize->image_path ? Storage::url($prize->image_path) : null,
+        ]);
+
         return Inertia::render('Admin/Raffles/Show', [
             'raffle' => $raffle,
             'mapped_numbers' => $numbers,
+            'reservations' => $reservations,
+            'prizeItems' => $prizeItems,
         ]);
     }
 

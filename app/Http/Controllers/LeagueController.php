@@ -6,6 +6,7 @@ use App\Enums\EventType;
 use App\Enums\UserRole;
 use App\Models\LeagueEvent;
 use App\Models\LeagueMatch;
+use App\Models\LeagueAttendance;
 use App\Models\LeaguePlayer;
 use App\Models\LeaguePoints;
 use App\Models\LeagueSeason;
@@ -31,7 +32,7 @@ class LeagueController extends Controller
 
     public function standings(?LeagueSeason $season = null): Response
     {
-        if (!auth()->check() || !auth()->user()->role === UserRole::MiembroGx && !auth()->user()->role === UserRole::Admin) {
+        if (!auth()->check() || !in_array(auth()->user()->role, [UserRole::MiembroGx, UserRole::Admin], true)) {
             return Inertia::render('Home', [
                 'flash' => ['error' => 'Solo los Miembros GX pueden ver la tabla de posiciones de la liga.']
             ]);
@@ -59,35 +60,74 @@ class LeagueController extends Controller
 
         $seasons = LeagueSeason::orderBy('created_at', 'desc')->get(['id', 'name']);
 
-        $totalCollected = $activeSeason
-            ? $activeSeason->players()->count() * $activeSeason->precio_inscripcion
-            : 0;
+        $collectionSummary = $activeSeason
+            ? LeagueAttendance::query()
+                ->join('league_events', 'league_events.id', '=', 'league_attendance.event_id')
+                ->join('league_seasons', 'league_seasons.id', '=', 'league_events.season_id')
+                ->where('league_events.season_id', $activeSeason->id)
+                ->where('league_events.event_type', EventType::Liga->value)
+                ->where('league_attendance.present', true)
+                ->selectRaw("
+                    COALESCE(
+                        SUM(
+                            CASE
+                                WHEN COALESCE(league_attendance.paid, 0) = 1 THEN COALESCE(NULLIF(league_events.registration_cost, 0), NULLIF(league_seasons.precio_inscripcion, 0), 0)
+                                ELSE 0
+                            END
+                        ),
+                        0
+                    ) as paid_total
+                ")
+                ->selectRaw("
+                    COALESCE(
+                        SUM(
+                            CASE
+                                WHEN COALESCE(league_attendance.paid, 0) = 0 THEN COALESCE(NULLIF(league_events.registration_cost, 0), NULLIF(league_seasons.precio_inscripcion, 0), 0)
+                                ELSE 0
+                            END
+                        ),
+                        0
+                    ) as pending_total
+                ")
+                ->first()
+            : null;
+
+        $totalCollected = (float) ($collectionSummary?->paid_total ?? 0);
+        $pendingCollected = (float) ($collectionSummary?->pending_total ?? 0);
 
         $upcomingEvents = $activeSeason
             ? LeagueEvent::where('season_id', $activeSeason->id)
+                ->where('event_type', EventType::Liga->value)
                 ->where('event_date', '>=', now()->startOfDay())
                 ->orderBy('event_date', 'asc')
                 ->get()
                 ->map(fn ($e) => [
                     'id' => $e->id,
                     'name' => $e->name,
-                    'date' => $e->event_date->format('d/m/Y H:i'),
+                    'date_label' => $e->event_date?->format('d-m-Y'),
+                    'time_label' => $e->time ?: $e->event_date?->format('H:i'),
+                    'event_date' => $e->event_date?->toIso8601String(),
+                    'location' => $e->location,
                     'is_live' => $e->is_live,
                 ])
             : [];
 
         $pastEvents = $activeSeason
             ? LeagueEvent::where('season_id', $activeSeason->id)
+                ->where('event_type', EventType::Liga->value)
                 ->where('event_date', '<', now()->startOfDay())
+                ->withCount('matches as total_matches')
                 ->orderBy('event_date', 'desc')
                 ->take(3)
                 ->get()
                 ->map(fn ($e) => [
                     'id' => $e->id,
                     'name' => $e->name,
-                    'date' => $e->event_date->format('d/m/Y H:i'),
+                    'date_label' => $e->event_date?->format('d-m-Y'),
+                    'time_label' => $e->time ?: $e->event_date?->format('H:i'),
+                    'event_date' => $e->event_date?->toIso8601String(),
                     'is_live' => $e->is_live,
-                    'total_matches' => LeagueMatch::where('event_id', $e->id)->count(),
+                    'total_matches' => $e->total_matches,
                 ])
             : [];
 
@@ -96,6 +136,7 @@ class LeagueController extends Controller
             'standings' => $standings,
             'seasons' => $seasons,
             'totalCollected' => $totalCollected,
+            'pendingCollected' => $pendingCollected,
             'upcomingEvents' => $upcomingEvents,
             'pastEvents' => $pastEvents,
         ]);

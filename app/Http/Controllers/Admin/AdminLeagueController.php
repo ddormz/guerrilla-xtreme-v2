@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,7 +26,31 @@ class AdminLeagueController extends Controller
     public function index(): Response
     {
         $seasons = LeagueSeason::orderBy('created_at', 'desc')->get();
-        $events = LeagueEvent::with('season')->orderBy('event_date', 'desc')->limit(20)->get();
+        $events = LeagueEvent::with('season:id,name')
+            ->select([
+                'id',
+                'season_id',
+                'name',
+                'event_type',
+                'event_date',
+                'time',
+                'status',
+                'description',
+                'rules',
+                'prizes',
+                'registration_cost',
+                'bank_name',
+                'account_type',
+                'account_holder',
+                'account_number',
+                'account_email',
+                'payment_instructions',
+                'show_on_index',
+                'location',
+            ])
+            ->orderBy('event_date', 'desc')
+            ->limit(20)
+            ->get();
 
         $users = User::whereIn('role', [
             \App\Enums\UserRole::MiembroGx->value,
@@ -43,11 +68,43 @@ class AdminLeagueController extends Controller
             ])
             ->get();
 
+        $pendingLeaguePayments = LeagueAttendance::query()
+            ->join('league_events', 'league_events.id', '=', 'league_attendance.event_id')
+            ->join('league_seasons', 'league_seasons.id', '=', 'league_events.season_id')
+            ->join('league_players', 'league_players.id', '=', 'league_attendance.player_id')
+            ->leftJoin('users', 'users.id', '=', 'league_players.user_id')
+            ->where('league_events.event_type', EventType::Liga->value)
+            ->where('league_attendance.present', true)
+            ->where(function ($query) {
+                $query->where('league_attendance.paid', false)
+                    ->orWhereNull('league_attendance.paid');
+            })
+            ->orderByDesc('league_events.event_date')
+            ->select([
+                'league_attendance.event_id',
+                'league_attendance.player_id',
+                'league_events.name as event_name',
+                'league_events.event_date as event_date',
+                \DB::raw('COALESCE(NULLIF(league_events.registration_cost, 0), NULLIF(league_seasons.precio_inscripcion, 0), 0) as pending_amount'),
+                'league_players.blader_name',
+                'users.name as user_name',
+            ])
+            ->get()
+            ->map(fn ($row) => [
+                'event_id' => (int) $row->event_id,
+                'player_id' => (int) $row->player_id,
+                'event_name' => $row->event_name,
+                'event_date' => $row->event_date ? Carbon::parse($row->event_date)->format('Y-m-d H:i:s') : null,
+                'blader_name' => $row->blader_name ?: $row->user_name ?: 'Blader',
+                'pending_amount' => (float) $row->pending_amount,
+            ]);
+
         return Inertia::render('Admin/League/Index', [
             'seasons' => $seasons,
             'events' => $events,
             'users' => $users,
             'players' => $players,
+            'pendingLeaguePayments' => $pendingLeaguePayments,
         ]);
     }
 
@@ -71,7 +128,7 @@ class AdminLeagueController extends Controller
         $validated = $request->validate([
             'season_id' => 'required|exists:league_seasons,id',
             'name' => 'required|string|max:255',
-            'event_type' => 'required|string',
+            'event_type' => ['required', 'string', Rule::in([EventType::Liga->value, EventType::Torneo->value])],
             'event_date' => 'required|date',
             'description' => 'nullable|string',
             'rules' => 'nullable|string',
@@ -87,6 +144,14 @@ class AdminLeagueController extends Controller
             'payment_instructions' => 'nullable|string',
             'show_on_index'     => 'boolean',
         ]);
+
+        $isLeagueEvent = ($validated['event_type'] ?? null) === EventType::Liga->value;
+
+        if ($isLeagueEvent) {
+            foreach (['description', 'rules', 'prizes', 'bank_name', 'account_type', 'account_holder', 'account_number', 'account_email', 'payment_instructions'] as $field) {
+                $validated[$field] = null;
+            }
+        }
 
         $resolvedTime = !empty($validated['time'])
             ? $validated['time']
@@ -187,7 +252,7 @@ class AdminLeagueController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'event_type' => 'required|string',
+            'event_type' => ['required', 'string', Rule::in([EventType::Liga->value, EventType::Torneo->value])],
             'event_date' => 'required|date',
             'description' => 'nullable|string',
             'rules' => 'nullable|string',
@@ -203,6 +268,14 @@ class AdminLeagueController extends Controller
             'payment_instructions' => 'nullable|string',
             'show_on_index'     => 'boolean',
         ]);
+
+        $isLeagueEvent = ($validated['event_type'] ?? null) === EventType::Liga->value;
+
+        if ($isLeagueEvent) {
+            foreach (['description', 'rules', 'prizes', 'bank_name', 'account_type', 'account_holder', 'account_number', 'account_email', 'payment_instructions'] as $field) {
+                $validated[$field] = null;
+            }
+        }
 
         $resolvedTime = !empty($validated['time'])
             ? $validated['time']

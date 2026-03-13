@@ -122,12 +122,33 @@
           </article>
         </div>
       </section>
+
+      <div v-if="showWinnerModal" class="winner-modal-overlay" @click.self="goToMatchList">
+        <div class="winner-modal card">
+          <div class="winner-icon">🏆</div>
+          <h2 class="winner-title">Partida finalizada</h2>
+          <p class="winner-name">{{ winnerModal.winnerName }}</p>
+          <p class="winner-score">Marcador: {{ winnerModal.scoreA }} - {{ winnerModal.scoreB }}</p>
+
+          <div class="winner-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              @click="goToNextAssignedMatch"
+            >
+              {{ winnerModal.nextMatchUrl ? 'Seguir al siguiente match asignado' : 'No hay siguiente, ver listado' }}
+            </button>
+            <button type="button" class="btn btn-outline" @click="goToMatchList">Ver listado de partidas</button>
+          </div>
+        </div>
+      </div>
     </div>
   </AppLayout>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue';
+import axios from 'axios';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/Composables/useConfirm';
 import { useToast } from '@/Composables/useToast';
@@ -140,8 +161,16 @@ const props = defineProps({
 });
 
 const { ask } = useConfirm();
-const { warning: toastWarning } = useToast();
+const { warning: toastWarning, success: toastSuccess, error: toastError } = useToast();
 const processing = ref(false);
+const showWinnerModal = ref(false);
+const winnerModal = ref({
+  winnerName: '',
+  scoreA: 0,
+  scoreB: 0,
+  nextMatchUrl: null,
+  listUrl: route('referee.dashboard', { filter: 'assigned' }),
+});
 
 const eventType = computed(() => props.matchData.event?.event_type?.value || props.matchData.event?.event_type || 'liga');
 
@@ -227,16 +256,48 @@ const finalizeMatch = async () => {
   if (!confirmed) return;
 
   processing.value = true;
-  router.post(route('referee.match.finalize', props.matchData.id), {
-    score_a: props.matchData.score_a,
-    score_b: props.matchData.score_b,
-    winner_id: winnerId
-  }, {
-    preserveScroll: true,
-    onFinish: () => {
-      processing.value = false;
-    },
-  });
+  try {
+    const { data } = await axios.post(
+      route('referee.match.finalize', props.matchData.id),
+      {
+        score_a: props.matchData.score_a,
+        score_b: props.matchData.score_b,
+        winner_id: winnerId,
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      },
+    );
+
+    winnerModal.value = {
+      winnerName: data?.winner_name || winnerName,
+      scoreA: data?.score_a ?? props.matchData.score_a,
+      scoreB: data?.score_b ?? props.matchData.score_b,
+      nextMatchUrl: data?.next_match_url || null,
+      listUrl: data?.list_url || route('referee.dashboard', { filter: 'assigned' }),
+    };
+    showWinnerModal.value = true;
+    toastSuccess(data?.message || 'Partida finalizada correctamente.');
+  } catch (error) {
+    const message = error?.response?.data?.message || 'No se pudo finalizar la partida.';
+    toastError(message);
+  } finally {
+    processing.value = false;
+  }
+};
+
+const goToNextAssignedMatch = () => {
+  const nextUrl = winnerModal.value.nextMatchUrl || winnerModal.value.listUrl;
+  showWinnerModal.value = false;
+  router.visit(nextUrl);
+};
+
+const goToMatchList = () => {
+  showWinnerModal.value = false;
+  router.visit(winnerModal.value.listUrl || route('referee.dashboard', { filter: 'assigned' }));
 };
 
 const formatTime = (dateStr) => {
@@ -453,6 +514,59 @@ const handleImageError = (e) => {
   border-left-color: #a855f7;
 }
 
+.winner-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 30);
+  background: rgba(0, 0, 0, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+.winner-modal {
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.winner-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  display: grid;
+  place-items: center;
+  font-size: 1.8rem;
+  margin: 0 auto;
+}
+
+.winner-title {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.winner-name {
+  margin: 0;
+  font-weight: 800;
+  color: #10b981;
+}
+
+.winner-score {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.winner-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 @media (max-width: 900px) {
   .arena-grid {
     grid-template-columns: 1fr;
@@ -474,4 +588,3 @@ const handleImageError = (e) => {
   }
 }
 </style>
-

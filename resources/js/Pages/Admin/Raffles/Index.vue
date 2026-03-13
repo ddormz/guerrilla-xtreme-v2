@@ -12,114 +12,178 @@
         <Link :href="route('admin.raffles.create')" class="btn btn-primary">+ Nueva Rifa</Link>
       </div>
 
-      <section class="mb-2xl">
-        <div class="flex items-center justify-between gap-md mb-md flex-wrap">
-          <h2 class="m-0">Historial de Reservas</h2>
-          <div class="flex gap-sm">
-            <button class="btn btn-sm" :class="historyTab === 'pending' ? 'btn-primary' : 'btn-ghost'" @click="historyTab = 'pending'" type="button">
-              Por validar ({{ pendingReservations.length }})
-            </button>
-            <button class="btn btn-sm" :class="historyTab === 'validated' ? 'btn-primary' : 'btn-ghost'" @click="historyTab = 'validated'" type="button">
-              Validadas ({{ validatedReservations.length }})
-            </button>
+      <div class="stats-grid mb-xl stagger">
+        <div class="card stat-card">
+          <span class="k">Reservas por validar</span>
+          <strong class="v text-amber-400">{{ pendingReservations.length }}</strong>
+        </div>
+        <div class="card stat-card">
+          <span class="k">Reservas validadas</span>
+          <strong class="v text-accent-green">{{ validatedReservations.length }}</strong>
+        </div>
+        <div class="card stat-card">
+          <span class="k">Monto pendiente</span>
+          <strong class="v text-amber-400">${{ formatAmount(totalPendingAmount) }}</strong>
+        </div>
+        <div class="card stat-card">
+          <span class="k">Monto validado</span>
+          <strong class="v text-accent-green">${{ formatAmount(totalValidatedAmount) }}</strong>
+        </div>
+      </div>
+
+      <div class="raffles-layout stagger">
+        <section class="card p-0 overflow-hidden reservations-panel">
+          <div class="panel-head">
+            <h2 class="m-0">Historial de Reservas</h2>
+            <div class="flex gap-sm flex-wrap">
+              <button
+                class="btn btn-sm"
+                :class="historyTab === 'pending' ? 'btn-primary' : 'btn-ghost'"
+                @click="historyTab = 'pending'"
+                type="button"
+              >
+                Por validar ({{ pendingReservations.length }})
+              </button>
+              <button
+                class="btn btn-sm"
+                :class="historyTab === 'validated' ? 'btn-primary' : 'btn-ghost'"
+                @click="historyTab = 'validated'"
+                type="button"
+              >
+                Validadas ({{ validatedReservations.length }})
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div v-if="activeReservations.length > 0" class="reservation-grid stagger">
-          <article v-for="res in activeReservations" :key="`${historyTab}-${res.id}`" class="reservation-item card">
-            <div class="res-head">
-              <div>
-                <strong>{{ res.buyer_name }}</strong>
-                <p class="text-xs text-muted">{{ res.blader_name || 'Sin blader' }} · {{ res.raffle?.name }}</p>
-              </div>
-              <span class="badge" :class="historyTab === 'pending' ? 'badge-amber' : 'badge-green'">
-                {{ historyTab === 'pending' ? 'PENDIENTE' : 'VALIDADA' }}
-              </span>
-            </div>
+          <div class="panel-filters">
+            <input
+              v-model.trim="search"
+              type="text"
+              class="form-input form-input-sm w-full"
+              placeholder="Buscar comprador, blader, correo o números..."
+            />
+          </div>
 
-            <div class="res-meta text-secondary text-sm">
-              <span>{{ res.email || 'Sin correo' }}</span>
-              <span v-if="res.phone">• {{ res.phone }}</span>
-            </div>
+          <div v-if="activeReservations.length" class="table-wrap">
+            <table class="gx-table">
+              <thead>
+                <tr>
+                  <th>Comprador</th>
+                  <th>Rifa</th>
+                  <th>Contacto</th>
+                  <th>Números</th>
+                  <th>Comprobante</th>
+                  <th class="text-right">Monto</th>
+                  <th>Fecha</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="res in activeReservations" :key="`${historyTab}-${res.id}`" class="table-row">
+                  <td>
+                    <div class="font-bold">{{ res.buyer_name }}</div>
+                    <div class="text-xs text-secondary">{{ res.blader_name || 'Sin blader' }}</div>
+                  </td>
+                  <td>
+                    <Link :href="route('admin.raffles.show', res.raffle_id)" class="font-bold hover:underline">
+                      {{ res.raffle?.name || `Rifa #${res.raffle_id}` }}
+                    </Link>
+                  </td>
+                  <td class="text-sm">
+                    <div>{{ res.email || 'Sin correo' }}</div>
+                    <div class="text-secondary">{{ res.phone || 'Sin teléfono' }}</div>
+                  </td>
+                  <td>
+                    <div class="numbers-wrap">
+                      <span v-for="n in res.numbers" :key="`${res.id}-${n}`" class="number-chip">{{ n }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <button
+                      v-if="res.proof_url"
+                      class="btn btn-outline btn-xs"
+                      type="button"
+                      @click="openProof(res)"
+                    >
+                      Ver
+                    </button>
+                    <span v-else class="text-xs text-secondary">Sin archivo</span>
+                  </td>
+                  <td class="text-right font-black">${{ formatAmount(res.total_amount) }}</td>
+                  <td class="text-xs text-secondary">
+                    {{ historyTab === 'pending' ? formatDateTime(res.created_at) : formatDateTime(res.validated_at || res.created_at) }}
+                  </td>
+                  <td class="text-right">
+                    <button
+                      v-if="historyTab === 'pending'"
+                      @click="approve(res.id)"
+                      class="btn btn-primary btn-xs"
+                      type="button"
+                    >
+                      Validar
+                    </button>
+                    <span v-else class="badge badge-green">OK</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="p-xl text-center text-secondary italic">
+            No hay reservas para este filtro.
+          </div>
+        </section>
 
-            <div class="res-numbers">
-              <span class="text-xs text-secondary uppercase">Números</span>
-              <p class="number-list">{{ formatNumbers(res.numbers) }}</p>
-            </div>
-
-            <div class="res-foot">
-              <div class="res-amount font-bold text-accent-green">${{ formatAmount(res.total_amount) }}</div>
-              <small class="text-xs text-secondary">{{ historyTab === 'pending' ? formatDateTime(res.created_at) : formatDateTime(res.validated_at || res.created_at) }}</small>
-            </div>
-
-            <div class="res-actions">
-              <button
-                v-if="res.proof_url"
-                @click="openProof(res)"
-                class="btn btn-outline btn-sm"
-                type="button"
-              >
-                Ver comprobante
-              </button>
-              <button
-                v-else
-                class="btn btn-ghost btn-sm"
-                type="button"
-                disabled
-              >
-                Sin comprobante
-              </button>
-
-              <button
-                v-if="historyTab === 'pending'"
-                @click="approve(res.id)"
-                class="btn btn-primary btn-sm"
-                type="button"
-              >
-                Validar Pago
-              </button>
-            </div>
-          </article>
-        </div>
-        <div v-else class="card p-xl text-center text-muted">
-          {{ historyTab === 'pending' ? 'No hay reservas pendientes de validación.' : 'No hay reservas validadas para mostrar.' }}
-        </div>
-      </section>
-
-      <section>
-        <h2 class="mb-lg">Sorteos</h2>
-        <div class="card p-0 overflow-hidden stagger">
-          <table class="gx-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th class="text-center">Estado</th>
-                <th class="text-center">Precio</th>
-                <th class="text-center">Números</th>
-                <th class="text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="raffle in raffles" :key="raffle.id" class="table-row">
-                <td class="font-bold">{{ raffle.name }}</td>
-                <td class="text-center">
-                  <span class="badge" :class="getStatusClass(raffle.status)">{{ raffle.status }}</span>
-                </td>
-                <td class="text-center">${{ formatAmount(raffle.ticket_price) }}</td>
-                <td class="text-center">{{ raffle.total_numbers }}</td>
-                <td class="text-right">
-                  <div class="flex gap-xs justify-end flex-wrap">
-                    <Link :href="route('admin.raffles.show', raffle.id)" class="btn btn-ghost btn-xs">Ver</Link>
-                    <Link :href="route('admin.raffles.edit', raffle.id)" class="btn btn-outline btn-xs">Editar</Link>
-                    <button @click="destroyRaffle(raffle)" class="btn btn-error btn-xs" title="Eliminar" type="button">🗑️</button>
-                    <button v-if="raffle.status === 'draft'" @click="publish(raffle.id)" class="btn btn-ghost btn-xs text-accent-green" type="button">Publicar</button>
+        <aside class="side-panel">
+          <section class="card p-md">
+            <h3 class="m-0 mb-md uppercase tracking-wider text-sm text-secondary">Rifas</h3>
+            <div class="raffles-list">
+              <article v-for="raffle in raffles" :key="raffle.id" class="raffle-item">
+                <div class="flex justify-between items-start gap-sm">
+                  <div>
+                    <h4 class="m-0">{{ raffle.name }}</h4>
+                    <p class="text-xs text-secondary m-0 mt-xs">#{{ raffle.id }}</p>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+                  <span class="badge" :class="getStatusClass(raffle.status)">{{ raffle.status }}</span>
+                </div>
+
+                <div class="raffle-metrics mt-sm">
+                  <div>
+                    <span class="k">Vendidos</span>
+                    <strong>{{ raffle.sold_numbers_count || 0 }}</strong>
+                  </div>
+                  <div>
+                    <span class="k">Reservados</span>
+                    <strong>{{ raffle.reserved_numbers_count || 0 }}</strong>
+                  </div>
+                  <div>
+                    <span class="k">Pendientes</span>
+                    <strong>{{ raffle.pending_reservations_count || 0 }}</strong>
+                  </div>
+                </div>
+
+                <div class="mt-sm text-sm text-secondary flex justify-between">
+                  <span>Precio ticket</span>
+                  <strong class="text-white">${{ formatAmount(raffle.ticket_price) }}</strong>
+                </div>
+
+                <div class="raffle-actions mt-sm">
+                  <Link :href="route('admin.raffles.show', raffle.id)" class="btn btn-ghost btn-xs">Gestionar</Link>
+                  <Link :href="route('admin.raffles.edit', raffle.id)" class="btn btn-outline btn-xs">Editar</Link>
+                  <button
+                    v-if="raffle.status === 'draft'"
+                    @click="publish(raffle.id)"
+                    class="btn btn-primary btn-xs"
+                    type="button"
+                  >
+                    Publicar
+                  </button>
+                  <button @click="destroyRaffle(raffle)" class="btn btn-error btn-xs" type="button">Eliminar</button>
+                </div>
+              </article>
+            </div>
+          </section>
+        </aside>
+      </div>
 
       <div v-if="proofModal.open" class="modal-overlay" @click.self="closeProof">
         <div class="modal-content card">
@@ -154,9 +218,33 @@ const props = defineProps({
 
 const { ask } = useConfirm();
 const historyTab = ref('pending');
+const search = ref('');
+
+const totalPendingAmount = computed(() => {
+  return props.pendingReservations.reduce((sum, row) => sum + (Number(row.total_amount) || 0), 0);
+});
+
+const totalValidatedAmount = computed(() => {
+  return props.validatedReservations.reduce((sum, row) => sum + (Number(row.total_amount) || 0), 0);
+});
 
 const activeReservations = computed(() => {
-  return historyTab.value === 'pending' ? props.pendingReservations : props.validatedReservations;
+  const source = historyTab.value === 'pending' ? props.pendingReservations : props.validatedReservations;
+  const term = search.value.toLowerCase();
+
+  if (!term) return source;
+
+  return source.filter((row) => {
+    const numbersText = (row.numbers || []).join(', ');
+    return [
+      row.buyer_name,
+      row.blader_name,
+      row.email,
+      row.phone,
+      row.raffle?.name,
+      numbersText,
+    ].some((value) => String(value || '').toLowerCase().includes(term));
+  });
 });
 
 const proofModal = reactive({
@@ -165,16 +253,13 @@ const proofModal = reactive({
   url: '',
 });
 
-const formatAmount = (val) => new Intl.NumberFormat('es-CL').format(val);
+const formatAmount = (val) => new Intl.NumberFormat('es-CL').format(Math.floor(Number(val) || 0));
 
 const formatDateTime = (value) => {
   if (!value) return '-';
-  return new Date(value).toLocaleString('es-CL');
-};
-
-const formatNumbers = (numbers) => {
-  if (!numbers || numbers.length === 0) return 'Sin números';
-  return numbers.join(', ');
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
 const getStatusClass = (status) => {
@@ -228,47 +313,133 @@ const approve = async (id) => {
 </script>
 
 <style scoped>
-.reservation-grid {
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--space-md);
-}
-
-.reservation-item {
-  display: flex;
-  flex-direction: column;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-sm);
 }
 
-.res-head {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  align-items: flex-start;
+.stat-card {
+  display: grid;
+  gap: 4px;
 }
 
-.number-list {
+.stat-card .k {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.stat-card .v {
   font-family: var(--font-display);
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: 1.45rem;
 }
 
-.res-foot {
+.raffles-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+.panel-head {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
   gap: var(--space-sm);
-}
-
-.res-actions {
-  display: flex;
-  gap: var(--space-sm);
+  align-items: center;
   flex-wrap: wrap;
 }
 
-.gx-table { width: 100%; border-collapse: collapse; }
-.gx-table th { padding: var(--space-md); text-align: left; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
-.gx-table td { padding: var(--space-md); border-bottom: 1px solid var(--border-color); }
+.panel-filters {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.numbers-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.number-chip {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.side-panel {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.raffles-list {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.raffle-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.raffle-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.raffle-metrics > div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  text-align: center;
+}
+
+.raffle-metrics .k {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.raffle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gx-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.gx-table th {
+  padding: var(--space-sm);
+  text-align: left;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.gx-table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
 
 .modal-overlay {
   position: fixed;
@@ -314,11 +485,25 @@ const approve = async (id) => {
   background: #0d0d0d;
 }
 
+@media (max-width: 1200px) {
+  .raffles-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 640px) {
-  .res-actions .btn {
-    flex: 1;
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .raffle-actions .btn {
+    flex: 1 1 auto;
   }
 }
 </style>
-
-

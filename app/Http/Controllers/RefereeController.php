@@ -160,7 +160,35 @@ class RefereeController extends Controller
             'concluded_at' => now(),
         ]);
 
-        return redirect()->route('referee.dashboard', ['filter' => 'assigned'])->with('success', 'Match finalizado y puntuación guardada.');
+        $winnerName = $validated['winner_id'] == $match->player_a_id
+            ? ($match->playerA?->blader_name ?: $match->playerA?->real_name ?: 'Jugador A')
+            : ($match->playerB?->blader_name ?: $match->playerB?->real_name ?: 'Jugador B');
+
+        $nextAssignedMatch = LeagueMatch::query()
+            ->where('referee_user_id', auth()->id())
+            ->where('concluded', false)
+            ->where('id', '!=', $match->id)
+            ->orderBy('event_id')
+            ->orderBy('created_at')
+            ->first();
+
+        $payload = [
+            'success' => true,
+            'winner_name' => $winnerName,
+            'score_a' => (int) $validated['score_a'],
+            'score_b' => (int) $validated['score_b'],
+            'next_match_url' => $nextAssignedMatch ? route('referee.match.panel', $nextAssignedMatch->id) : null,
+            'list_url' => route('referee.dashboard', ['filter' => 'assigned']),
+            'message' => 'Match finalizado y puntuación guardada.',
+        ];
+
+        if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
+            return response()->json($payload);
+        }
+
+        return redirect()
+            ->route('referee.dashboard', ['filter' => 'assigned'])
+            ->with('success', 'Match finalizado. Ganador: ' . $winnerName . '.');
     }
 
     public function show(LeagueMatch $match)

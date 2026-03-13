@@ -60,7 +60,7 @@
                   <td class="text-center">
                     <span class="badge" :class="e.event_type === 'torneo' ? 'badge-amber' : 'badge-blue'">{{ e.event_type }}</span>
                   </td>
-                  <td class="text-right text-sm">{{ new Date(e.event_date).toLocaleDateString('es-CL') }}</td>
+                  <td class="text-right text-sm">{{ formatDateTime(e.event_date) }}</td>
                   <td class="text-right">
                     <div class="flex gap-sm justify-end items-center">
                       <Link :href="route('admin.events.show', e.id)" class="btn btn-primary btn-xs">Gestionar</Link>
@@ -71,6 +71,44 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section class="full-width stagger">
+          <h2 class="mb-lg">Pagos Pendientes de Liga</h2>
+          <div class="card p-0 overflow-hidden">
+            <div class="p-md border-b border-white/10 flex items-center justify-between gap-sm flex-wrap">
+              <p class="m-0 text-sm text-secondary">Bladers presentes con pago pendiente por fecha de liga.</p>
+              <span class="badge badge-amber">
+                Total pendiente: ${{ formatAmount(totalPendingPayments) }}
+              </span>
+            </div>
+
+            <table v-if="pendingLeaguePayments.length" class="gx-table">
+              <thead>
+                <tr>
+                  <th>Evento</th>
+                  <th>Fecha</th>
+                  <th>Blader</th>
+                  <th class="text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="pending in pendingLeaguePayments" :key="`${pending.event_id}-${pending.player_id}`" class="table-row">
+                  <td>
+                    <Link :href="route('admin.events.show', pending.event_id)" class="font-bold hover:underline">
+                      {{ pending.event_name }}
+                    </Link>
+                  </td>
+                  <td class="text-sm text-secondary">{{ formatDateTime(pending.event_date) }}</td>
+                  <td class="font-bold">{{ pending.blader_name }}</td>
+                  <td class="text-right text-amber-400 font-black">${{ formatAmount(pending.pending_amount) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="p-lg text-center text-secondary italic">
+              No hay pagos pendientes de liga.
+            </div>
           </div>
         </section>
 
@@ -145,9 +183,9 @@
         <div class="modal-content card">
           <h3>{{ editingEvent ? 'Editar' : 'Nuevo' }} Evento</h3>
           <form @submit.prevent="submitEvent" class="mt-lg">
-            <div class="form-group mb-md font-bold">
+            <div v-if="eventForm.event_type === 'torneo'" class="form-group mb-md font-bold">
               <label class="form-label">Reglas del Evento <span class="badge badge-amber badge-xs ml-auto">IMPORTANTE</span></label>
-              <textarea v-model="eventForm.rules" class="form-input" rows="3" placeholder="Ingresa las bases y restricciones del torneo..." required></textarea>
+              <textarea v-model="eventForm.rules" class="form-input" rows="3" placeholder="Ingresa las bases y restricciones del torneo..."></textarea>
             </div>
 
             <div class="form-group mb-md">
@@ -176,11 +214,11 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Lugar</label>
-                <input type="text" v-model="eventForm.location" class="form-input" />
+                <input type="text" v-model="eventForm.location" class="form-input" required />
               </div>
             </div>
 
-            <div class="form-group mb-md">
+            <div v-if="eventForm.event_type === 'torneo'" class="form-group mb-md">
               <label class="form-label flex justify-between items-center">
                 Premios
                 <button type="button" @click="addPrizeRow" class="text-accent-green text-[10px] font-black uppercase hover:underline">+ Añadir Premio</button>
@@ -193,9 +231,9 @@
               </div>
             </div>
 
-            <div class="divider mb-md">Datos Bancarios (Para Torneos)</div>
+            <div v-if="eventForm.event_type === 'torneo'" class="divider mb-md">Datos Bancarios (Para Torneos)</div>
 
-            <div class="grid grid-cols-2 gap-md mb-md">
+            <div v-if="eventForm.event_type === 'torneo'" class="grid grid-cols-2 gap-md mb-md">
               <div class="form-group">
                 <label class="form-label">Banco</label>
                 <input type="text" v-model="eventForm.bank_name" class="form-input" placeholder="Banco Estado" />
@@ -206,7 +244,7 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-md mb-md">
+            <div v-if="eventForm.event_type === 'torneo'" class="grid grid-cols-2 gap-md mb-md">
               <div class="form-group">
                 <label class="form-label">Tipo de Cuenta</label>
                 <input type="text" v-model="eventForm.account_type" class="form-input" placeholder="Corriente / Vista" />
@@ -217,12 +255,12 @@
               </div>
             </div>
 
-            <div class="form-group mb-md">
+            <div v-if="eventForm.event_type === 'torneo'" class="form-group mb-md">
               <label class="form-label">Email de Pago</label>
               <input type="email" v-model="eventForm.account_email" class="form-input" />
             </div>
 
-            <div class="form-group mb-md">
+            <div v-if="eventForm.event_type === 'torneo'" class="form-group mb-md">
               <label class="form-label">Instrucciones de Pago</label>
               <textarea v-model="eventForm.payment_instructions" class="form-input" rows="2" placeholder="Ej: Enviar comprobante al Instagram..."></textarea>
             </div>
@@ -291,7 +329,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { useConfirm } from '@/Composables/useConfirm';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -302,6 +340,10 @@ const props = defineProps({
   events: Array,
   users: Array,
   players: Array,
+  pendingLeaguePayments: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const { ask } = useConfirm();
@@ -348,10 +390,29 @@ const playerEditForm = useForm({
 });
 
 const sortedPlayers = computed(() => [...props.players].sort((a, b) => (b.total_points || 0) - (a.total_points || 0)));
+const totalPendingPayments = computed(() => {
+  return props.pendingLeaguePayments.reduce((sum, row) => sum + (Number(row.pending_amount) || 0), 0);
+});
 
 const leagueRank = (playerId) => {
   const index = sortedPlayers.value.findIndex((p) => p.id === playerId);
   return index >= 0 ? `${index + 1}°` : '-';
+};
+
+const formatAmount = (value) => new Intl.NumberFormat('es-CL').format(Math.floor(Number(value) || 0));
+
+const formatDateTime = (value) => {
+  if (!value) return 'Sin fecha';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString('es-CL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const openModal = (type) => {
@@ -362,6 +423,7 @@ const openModal = (type) => {
     eventForm.event_type = 'liga';
     eventForm.prizes_list = [''];
     eventForm._method = 'POST';
+    resetTournamentOnlyFields();
   }
   activeModal.value = type;
 };
@@ -481,9 +543,31 @@ const removePrizeRow = (index) => {
   }
 };
 
+const resetTournamentOnlyFields = () => {
+  eventForm.description = '';
+  eventForm.rules = '';
+  eventForm.prizes = '';
+  eventForm.prizes_list = [''];
+  eventForm.bank_name = '';
+  eventForm.account_type = '';
+  eventForm.account_holder = '';
+  eventForm.account_number = '';
+  eventForm.account_email = '';
+  eventForm.payment_instructions = '';
+};
+
+watch(() => eventForm.event_type, (type) => {
+  if (type === 'liga') {
+    resetTournamentOnlyFields();
+  }
+});
+
 const submitEvent = () => {
-  // Sync prizes_list to prizes string
-  eventForm.prizes = eventForm.prizes_list.filter(p => p.trim() !== '').join('\n');
+  if (eventForm.event_type === 'torneo') {
+    eventForm.prizes = eventForm.prizes_list.filter((p) => p.trim() !== '').join('\n');
+  } else {
+    resetTournamentOnlyFields();
+  }
 
   if (editingEvent.value) {
     eventForm.post(route('admin.events.update', editingEvent.value.id), { onSuccess: () => (activeModal.value = null) });

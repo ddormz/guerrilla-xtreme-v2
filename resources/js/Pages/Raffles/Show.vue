@@ -83,7 +83,7 @@
                   </div>
 
                   <div v-if="!isReservationEnabled" class="message-box warn mb-lg border-amber-500/50 bg-amber-500/10 text-amber-400">
-                    Esta rifa no acepta más reservas.
+                    {{ blockedReservationMessage }}
                   </div>
 
                   <div class="numbers-grid">
@@ -278,6 +278,9 @@ const finalNumbers = ref([]);
 const proofInput = ref(null);
 
 const isReservationEnabled = computed(() => !!props.raffle?.can_reserve);
+const blockedReservationMessage = computed(() => {
+  return props.raffle?.reservation_blocked_message || 'Esta rifa no acepta más reservas.';
+});
 const selectedSet = computed(() => new Set(selectedNumbers.value));
 const formattedFinalNumbers = computed(() => [...finalNumbers.value].sort((a, b) => a - b).join(', '));
 
@@ -330,7 +333,7 @@ const formatPrice = (price) => new Intl.NumberFormat('es-CL').format(price);
 
 const nextStep = () => {
   if (!isReservationEnabled.value) {
-    toastWarning('Esta rifa no acepta más reservas.');
+    toastWarning(blockedReservationMessage.value);
     return;
   }
 
@@ -341,6 +344,10 @@ const nextStep = () => {
 
 const copyAllPaymentInfo = async () => {
   const text = Object.entries(props.paymentInfo || {})
+    .filter(([key]) => {
+      const normalized = String(key).toLowerCase();
+      return !normalized.includes('instrucciones') && !normalized.includes('monto');
+    })
     .map(([key, val]) => `${key}: ${val}`)
     .join('\n');
 
@@ -372,7 +379,7 @@ const removeProof = () => {
 
 const submitReservation = () => {
   if (!isReservationEnabled.value) {
-    toastWarning('Esta rifa no acepta más reservas.');
+    toastWarning(blockedReservationMessage.value);
     return;
   }
 

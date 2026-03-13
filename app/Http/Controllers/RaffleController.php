@@ -53,6 +53,15 @@ class RaffleController extends Controller
             && (!$raffle->sales_end_at || $raffle->sales_end_at >= $now);
 
         $canReserve = $raffle->status === RaffleStatus::Published && $withinSalesWindow;
+        $reservationBlockedMessage = match ($raffle->status) {
+            RaffleStatus::Drawn => 'Esta rifa ya fue sorteada. No se pueden seleccionar números.',
+            RaffleStatus::Cancelled => 'Esta rifa fue cancelada y no admite reservas.',
+            RaffleStatus::Closed => 'Las reservas para esta rifa ya se encuentran cerradas.',
+            RaffleStatus::Draft => 'Esta rifa aún no está publicada.',
+            default => $withinSalesWindow
+                ? 'Esta rifa no acepta más reservas.'
+                : 'Las reservas no están disponibles en este momento para esta rifa.',
+        };
 
         $prizesByPosition = $raffle->prizes->keyBy('position');
 
@@ -86,6 +95,7 @@ class RaffleController extends Controller
                 'status_label' => $raffle->status->label(),
                 'draw_at' => $raffle->draw_at?->format('d/m/Y H:i'),
                 'can_reserve' => $canReserve,
+                'reservation_blocked_message' => $canReserve ? null : $reservationBlockedMessage,
                 'numbers' => $raffle->numbers->map(fn ($n) => [
                     'number' => $n->number,
                     'status' => $n->status->value,
@@ -115,6 +125,10 @@ class RaffleController extends Controller
 
     public function reserve(Request $request, Raffle $raffle)
     {
+        if ($raffle->status === RaffleStatus::Drawn) {
+            return back()->with('error', 'Esta rifa ya fue sorteada. No se pueden seleccionar números.');
+        }
+
         $now = now();
         $withinSalesWindow = (!$raffle->sales_start_at || $raffle->sales_start_at <= $now)
             && (!$raffle->sales_end_at || $raffle->sales_end_at >= $now);

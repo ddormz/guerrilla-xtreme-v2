@@ -57,11 +57,12 @@
           <div v-if="upcomingEvents?.length" class="space-y-sm">
             <div v-for="ev in upcomingEvents" :key="ev.id" class="event-mini-card upcoming">
               <div class="ev-date">
-                <span class="day">{{ new Date(ev.date).getDate() }}</span>
-                <span class="month">{{ new Date(ev.date).toLocaleString('es-CL', { month: 'short' }).toUpperCase() }}</span>
+                <span class="day">{{ eventDay(ev) }}</span>
+                <span class="month">{{ eventMonth(ev) }}</span>
               </div>
               <div class="ev-info">
                 <strong>{{ ev.name }}</strong>
+                <span class="text-xs text-secondary">{{ eventWhen(ev) }}</span>
                 <span class="text-xs text-secondary">{{ ev.location || 'Por definir' }}</span>
               </div>
             </div>
@@ -74,11 +75,12 @@
           <div v-if="pastEvents?.length" class="space-y-sm">
             <div v-for="ev in pastEvents" :key="ev.id" class="event-mini-card past">
               <div class="ev-date">
-                <span class="day">{{ new Date(ev.date).getDate() }}</span>
-                <span class="month">{{ new Date(ev.date).toLocaleString('es-CL', { month: 'short' }).toUpperCase() }}</span>
+                <span class="day">{{ eventDay(ev) }}</span>
+                <span class="month">{{ eventMonth(ev) }}</span>
               </div>
               <div class="ev-info">
                 <strong>{{ ev.name }}</strong>
+                <span class="text-xs text-secondary">{{ eventWhen(ev) }}</span>
                 <span class="text-xs text-accent-green">Finalizado ✓</span>
               </div>
             </div>
@@ -95,6 +97,13 @@
             <div>
               <div class="label">Pozo recaudado</div>
               <div class="value">${{ formatPrice(totalCollected || 0) }}</div>
+            </div>
+          </div>
+          <div class="pool-card">
+            <div class="pool-icon">🕒</div>
+            <div>
+              <div class="label">Pendiente</div>
+              <div class="value">${{ formatPrice(pendingCollected || 0) }}</div>
             </div>
           </div>
           <div class="pool-card">
@@ -187,6 +196,7 @@ defineProps({
   standings: Array,
   seasons: Array,
   totalCollected: Number,
+  pendingCollected: Number,
   upcomingEvents: Array,
   pastEvents: Array,
 });
@@ -213,6 +223,52 @@ const podiumMessage = (index) => {
 };
 
 const formatPrice = (price) => new Intl.NumberFormat('es-CL').format(price);
+
+const parseEventDate = (event) => {
+  if (!event) return null;
+
+  if (event.event_date) {
+    const parsed = new Date(event.event_date);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+
+  if (event.date_label) {
+    const [d, m, y] = String(event.date_label).split('-');
+    if (d && m && y) {
+      const parsed = new Date(`${y}-${m}-${d}T${event.time_label || '00:00'}`);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+  }
+
+  return null;
+};
+
+const eventDay = (event) => {
+  const date = parseEventDate(event);
+  return date ? String(date.getDate()).padStart(2, '0') : '--';
+};
+
+const eventMonth = (event) => {
+  const date = parseEventDate(event);
+  return date ? date.toLocaleString('es-CL', { month: 'short' }).toUpperCase() : '---';
+};
+
+const eventWhen = (event) => {
+  if (event?.date_label && event?.time_label) {
+    return `${event.date_label} • ${event.time_label}`;
+  }
+
+  if (event?.date_label) {
+    return event.date_label;
+  }
+
+  const date = parseEventDate(event);
+  if (!date) return 'Fecha por definir';
+
+  const dateLabel = date.toLocaleDateString('es-CL');
+  const timeLabel = date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  return `${dateLabel} • ${timeLabel}`;
+};
 
 const handleImageError = (e) => {
   e.target.src = '/img/logo.png';

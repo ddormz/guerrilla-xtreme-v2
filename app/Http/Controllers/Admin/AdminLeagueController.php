@@ -14,6 +14,7 @@ use App\Models\TournamentRegistration;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
@@ -87,6 +88,10 @@ class AdminLeagueController extends Controller
             'show_on_index'     => 'boolean',
         ]);
 
+        $resolvedTime = !empty($validated['time'])
+            ? $validated['time']
+            : Carbon::parse($validated['event_date'])->format('H:i');
+
         $event = LeagueEvent::create([
             'season_id' => $validated['season_id'],
             'name' => $validated['name'],
@@ -96,7 +101,7 @@ class AdminLeagueController extends Controller
             'description' => $validated['description'] ?? null,
             'rules' => $validated['rules'] ?? null,
             'location' => $validated['location'] ?? null,
-            'time' => $validated['time'] ?? null,
+            'time' => $resolvedTime,
             'prizes'            => $validated['prizes'] ?? null,
             'registration_cost' => $validated['registration_cost'] ?? 0,
             'bank_name'         => $validated['bank_name'] ?? null,
@@ -183,6 +188,7 @@ class AdminLeagueController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'event_type' => 'required|string',
+            'event_date' => 'required|date',
             'description' => 'nullable|string',
             'rules' => 'nullable|string',
             'location' => 'nullable|string',
@@ -198,8 +204,13 @@ class AdminLeagueController extends Controller
             'show_on_index'     => 'boolean',
         ]);
 
+        $resolvedTime = !empty($validated['time'])
+            ? $validated['time']
+            : Carbon::parse($validated['event_date'])->format('H:i');
+
         $event->update([
             ...$validated,
+            'time' => $resolvedTime,
             'event_type' => EventType::from($validated['event_type']),
         ]);
 

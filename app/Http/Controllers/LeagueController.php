@@ -13,7 +13,9 @@ use App\Models\TournamentRegistration;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\LeagueService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -162,6 +164,48 @@ class LeagueController extends Controller
         ]);
     }
 
+    public function checkRegistration(Request $request, LeagueEvent $event): JsonResponse
+    {
+        $validated = $request->validate([
+            'blader_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+        ]);
+
+        $bladerName = !empty($validated['blader_name']) ? $this->normalizeBladerName($validated['blader_name']) : null;
+        $email = !empty($validated['email']) ? $this->normalizeEmail($validated['email']) : null;
+
+        if (empty($bladerName) && empty($email) && !auth()->check()) {
+            return response()->json([
+                'exists' => false,
+                'message' => null,
+            ]);
+        }
+
+        $query = TournamentRegistration::where('event_id', $event->id);
+        $query->where(function ($q) use ($bladerName, $email) {
+            if (!empty($bladerName)) {
+                $q->whereRaw('LOWER(TRIM(blader_name)) = ?', [mb_strtolower($bladerName)]);
+            }
+
+            if (!empty($email)) {
+                $method = !empty($bladerName) ? 'orWhereRaw' : 'whereRaw';
+                $q->{$method}('LOWER(TRIM(email)) = ?', [$email]);
+            }
+
+            if (auth()->check()) {
+                $method = !empty($bladerName) || !empty($email) ? 'orWhere' : 'where';
+                $q->{$method}('generated_user_id', auth()->id());
+            }
+        });
+
+        $exists = $query->exists();
+
+        return response()->json([
+            'exists' => $exists,
+            'message' => $exists ? 'Ya te encuentras pre-registrado en este evento.' : null,
+        ]);
+    }
+
     public function storeRegistration(Request $request, LeagueEvent $event)
     {
         $isRexRegistered = $request->boolean('is_rex_registered');
@@ -210,14 +254,18 @@ class LeagueController extends Controller
         $validated['birth_date'] = $validated['birth_date'] ?: null;
         $validated['whatsapp'] = $validated['whatsapp'] ?: null;
         $validated['email'] = $validated['email'] ?: null;
+        $validated['blader_name'] = $this->normalizeBladerName($validated['blader_name']);
+        $validated['first_name'] = $validated['first_name'] ? trim($validated['first_name']) : null;
+        $validated['last_name'] = $validated['last_name'] ? trim($validated['last_name']) : null;
+        $validated['email'] = $validated['email'] ? $this->normalizeEmail($validated['email']) : null;
 
         // Duplicate prevention
         $query = TournamentRegistration::where('event_id', $event->id);
         $query->where(function ($q) use ($validated) {
-            $q->where('blader_name', $validated['blader_name']);
+            $q->whereRaw('LOWER(TRIM(blader_name)) = ?', [mb_strtolower($validated['blader_name'])]);
 
             if (!empty($validated['email'])) {
-                $q->orWhere('email', $validated['email']);
+                $q->orWhereRaw('LOWER(TRIM(email)) = ?', [$validated['email']]);
             }
 
             if (auth()->check()) {
@@ -232,7 +280,7 @@ class LeagueController extends Controller
         $generatedUserId = null;
 
         if (!$validated['is_rex_registered']) {
-            $existingUser = User::where('email', $validated['email'])->first();
+            $existingUser = User::whereRaw('LOWER(TRIM(email)) = ?', [$validated['email']])->first();
             if (!$existingUser) {
                 $generated = User::create([
                     'name' => trim($validated['first_name'] . ' ' . $validated['last_name']),
@@ -255,23 +303,50 @@ class LeagueController extends Controller
             $proofPath = $request->file('proof')->store('proofs/tournaments', 'public');
         }
 
-        $registration = TournamentRegistration::create([
-            'event_id' => $event->id,
-            'player_id' => auth()->check() ? auth()->user()->player?->id : null,
-            'is_internal' => false,
-            'first_name' => $validated['first_name'] ?? null,
-            'last_name' => $validated['last_name'] ?? null,
-            'blader_name' => $validated['blader_name'],
-            'birth_date' => $validated['birth_date'] ?? null,
-            'whatsapp' => $validated['whatsapp'] ?? null,
-            'email' => $validated['email'] ?? null,
-            'is_rex_registered' => $validated['is_rex_registered'],
-            'generated_user_id' => $generatedUserId,
-            'proof_path' => $proofPath,
-            'payment_option' => $validated['payment_option'],
-            'status' => 'pending',
-            'payment_date' => $validated['payment_option'] === 'now' ? now() : null,
-        ]);
+        try {
+            $registration = DB::transaction(function () use ($event, $validated, $generatedUserId, $proofPath) {
+                $duplicateQuery = TournamentRegistration::where('event_id', $event->id)->lockForUpdate();
+                $duplicateQuery->where(function ($q) use ($validated) {
+                    $q->whereRaw('LOWER(TRIM(blader_name)) = ?', [mb_strtolower($validated['blader_name'])]);
+
+                    if (!empty($validated['email'])) {
+                        $q->orWhereRaw('LOWER(TRIM(email)) = ?', [$validated['email']]);
+                    }
+
+                    if (auth()->check()) {
+                        $q->orWhere('generated_user_id', auth()->id());
+                    }
+                });
+
+                if ($duplicateQuery->exists()) {
+                    throw new \RuntimeException('duplicate_registration');
+                }
+
+                return TournamentRegistration::create([
+                    'event_id' => $event->id,
+                    'player_id' => auth()->check() ? auth()->user()->player?->id : null,
+                    'is_internal' => false,
+                    'first_name' => $validated['first_name'] ?? null,
+                    'last_name' => $validated['last_name'] ?? null,
+                    'blader_name' => $validated['blader_name'],
+                    'birth_date' => $validated['birth_date'] ?? null,
+                    'whatsapp' => $validated['whatsapp'] ?? null,
+                    'email' => $validated['email'] ?? null,
+                    'is_rex_registered' => $validated['is_rex_registered'],
+                    'generated_user_id' => $generatedUserId,
+                    'proof_path' => $proofPath,
+                    'payment_option' => $validated['payment_option'],
+                    'status' => 'pending',
+                    'payment_date' => $validated['payment_option'] === 'now' ? now() : null,
+                ]);
+            }, 3);
+        } catch (\RuntimeException $e) {
+            if ($e->getMessage() === 'duplicate_registration') {
+                return back()->with('error', 'Ya te encuentras pre-registrado en este evento.');
+            }
+
+            throw $e;
+        }
 
         AuditLogger::log('register_tournament', 'TournamentRegistration', $registration->id, [
             'event_id' => $event->id,
@@ -428,6 +503,17 @@ class LeagueController extends Controller
 
         $fallback = trim(($firstName ?? '') . ' ' . ($lastName ?? ''));
         return $fallback !== '' ? $fallback : 'Blader';
+    }
+
+    private function normalizeBladerName(string $value): string
+    {
+        $trimmed = trim($value);
+        return preg_replace('/\s+/', ' ', $trimmed) ?: $trimmed;
+    }
+
+    private function normalizeEmail(string $value): string
+    {
+        return mb_strtolower(trim($value));
     }
 
     public function playerProfile(LeaguePlayer $player): Response

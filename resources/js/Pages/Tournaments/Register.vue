@@ -46,7 +46,7 @@
                   </div>
                   <div>
                     <span class="k">Hora</span>
-                    <p>{{ event.time || 'Por confirmar' }}</p>
+                    <p>{{ eventTimeLabel }}</p>
                   </div>
                   <div v-if="event.prizes" class="event-block col-span-2">
                     <span class="k text-amber-500">🏆 Premios</span>
@@ -254,7 +254,9 @@
 
             <div class="actions-row">
               <button type="button" class="btn btn-secondary" @click="prevStep" :disabled="currentStep === 1">← Anterior</button>
-              <button v-if="currentStep < 5" type="button" class="btn btn-primary" @click="nextStep" :disabled="currentStep === 1 && isRegistered">Siguiente →</button>
+              <button v-if="currentStep < 5" type="button" class="btn btn-primary" @click="nextStep" :disabled="(currentStep === 1 && isRegistered) || duplicateCheckLoading">
+                {{ duplicateCheckLoading ? 'Validando...' : 'Siguiente →' }}
+              </button>
               <button v-else type="submit" class="btn btn-primary" :disabled="form.processing">
                 {{ form.processing ? 'Enviando...' : (form.payment_option === 'later' ? 'Completar pre-registro' : 'Confirmar registro y pago') }}
               </button>
@@ -329,10 +331,20 @@ const props = defineProps({
 const stepTitles = ['Evento', 'R.E.X?', 'Blader', 'Contacto', 'Pago'];
 const currentStep = ref(1);
 const isRex = computed(() => form.is_rex_registered === true);
+const eventTimeLabel = computed(() => {
+  if (props.event?.time) return props.event.time;
+  if (!props.event?.event_date) return 'Por confirmar';
+
+  const date = new Date(props.event.event_date);
+  if (Number.isNaN(date.getTime())) return 'Por confirmar';
+
+  return date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+});
 const proofInput = ref(null);
 const showRexModal = ref(false);
 const showSuccessModal = ref(false);
 const redirectCountdown = ref(30);
+const duplicateCheckLoading = ref(false);
 let redirectInterval = null;
 let redirectTimeout = null;
 
@@ -408,24 +420,13 @@ const removeProof = () => {
 };
 
 const copyPaymentData = async () => {
-  const amount = new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(props.event.registration_cost || 0);
-
   const lines = [
     `Banco: ${props.event.bank_name || 'Banco Estado'}`,
     `Titular: ${props.event.account_holder || 'Daniel Orellana'}`,
     `Tipo de cuenta: ${props.event.account_type || 'Cuenta Vista / Rut'}`,
     `Numero de cuenta: ${props.event.account_number || '20539169'}`,
     `Email: ${props.event.account_email || 'ventas@gxbeyblade.com'}`,
-    `Monto torneo: ${amount}`,
   ];
-
-  if (props.event.payment_instructions) {
-    lines.push(`Instrucciones: ${props.event.payment_instructions}`);
-  }
 
   const text = lines.join('\n');
 
@@ -483,12 +484,44 @@ const startPostRegisterCountdown = () => {
   }, 30000);
 };
 
-const nextStep = () => {
+const checkDuplicateRegistration = async () => {
+  if (!form.blader_name && !form.email && !pageProps?.auth?.user) {
+    return false;
+  }
+
+  duplicateCheckLoading.value = true;
+  try {
+    const { data } = await window.axios.post(route('tournaments.register.check', props.event.id), {
+      blader_name: form.blader_name || null,
+      email: form.email || null,
+    });
+
+    if (data?.exists) {
+      toastWarning(data?.message || 'Ya te encuentras pre-registrado en este evento.');
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    const message = error?.response?.data?.message || 'No se pudo verificar el registro. Intenta nuevamente.';
+    toastError(message);
+    return true;
+  } finally {
+    duplicateCheckLoading.value = false;
+  }
+};
+
+const nextStep = async () => {
   if (currentStep.value === 1 && props.isRegistered) {
     toastWarning('Ya te encuentras registrado en este torneo.');
     return;
   }
   if (!validateStep()) return;
+
+  if (currentStep.value === 3 || (currentStep.value === 4 && !form.is_rex_registered)) {
+    const isDuplicate = await checkDuplicateRegistration();
+    if (isDuplicate) return;
+  }
   
   if (currentStep.value === 3 && form.is_rex_registered) {
     currentStep.value = 5; // Jump to payment
@@ -518,26 +551,38 @@ const submit = () => {
     return;
   }
 
-  form
-    .transform((data) => ({
-      ...data,
-      is_rex_registered: data.is_rex_registered ? 1 : 0,
-    }))
-    .post(route('tournaments.register.store', props.event.id), {
-      forceFormData: true,
-      preserveScroll: true,
-      preserveState: true,
-      onSuccess: () => {
-        currentStep.value = 1;
-        form.reset();
-        toastSuccess('Pre-registro confirmado correctamente.');
-        startPostRegisterCountdown();
-      },
-      onError: (errors) => {
-        const firstError = Object.values(errors || {})[0];
-        toastError(firstError || 'No se pudo completar el pre-registro.');
-      },
-    });
+  checkDuplicateRegistration().then((isDuplicate) => {
+    if (isDuplicate) return;
+
+    form
+      .transform((data) => ({
+        ...data,
+        is_rex_registered: data.is_rex_registered ? 1 : 0,
+      }))
+      .post(route('tournaments.register.store', props.event.id), {
+        forceFormData: true,
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: (page) => {
+          const flashError = page?.props?.flash?.error;
+          const flashWarning = page?.props?.flash?.warning;
+
+          if (flashError || flashWarning) {
+            toastWarning(flashError || flashWarning);
+            return;
+          }
+
+          currentStep.value = 1;
+          form.reset();
+          toastSuccess('Pre-registro confirmado correctamente.');
+          startPostRegisterCountdown();
+        },
+        onError: (errors) => {
+          const firstError = Object.values(errors || {})[0];
+          toastError(firstError || 'No se pudo completar el pre-registro.');
+        },
+      });
+  });
 };
 </script>
 

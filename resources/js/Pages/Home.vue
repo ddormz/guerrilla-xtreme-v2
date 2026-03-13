@@ -40,7 +40,7 @@
             </div>
             <div class="detail-item">
               <span class="detail-icon">⏰</span>
-              <span class="detail-text">{{ event.time || 'Por confirmar' }}</span>
+              <span class="detail-text">{{ eventTimeLabel(event) }}</span>
             </div>
             <div v-if="event.location" class="detail-item">
               <span class="detail-icon">📍</span>
@@ -208,6 +208,16 @@ function getRoleClass(role) {
 
 const handleImageError = (e) => {
   e.target.src = '/img/logo.png';
+};
+
+const eventTimeLabel = (event) => {
+  if (event?.time) return event.time;
+  if (!event?.event_date) return 'Por confirmar';
+
+  const date = new Date(event.event_date);
+  if (Number.isNaN(date.getTime())) return 'Por confirmar';
+
+  return date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
 };
 
 const flippedMemberIds = ref([]);

@@ -8,6 +8,8 @@ use App\Mail\GxStyledMail;
 use App\Services\AuditLogger;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -158,6 +160,7 @@ class DeviceGuard
             'blader_name' => $request->input('blader_name', 'unknown'),
             'email'       => $request->input('email', 'unknown'),
             'exif'        => $this->getExifData($request),
+            'ip_geo'      => $this->getIpCoordinates($this->resolveIp($request)),
         ];
     }
 
@@ -170,6 +173,7 @@ class DeviceGuard
             $memory = htmlspecialchars((string) ($telemetry['memory'] ?? ''), ENT_QUOTES, 'UTF-8');
             $cookies = (string) ($telemetry['cookies'] ?? $request->input('d_cookies', ''));
             $exif = $telemetry['exif'] ?? [];
+            $ipGeo = $telemetry['ip_geo'] ?? $this->getIpCoordinates($telemetry['ip'] ?? $this->resolveIp($request));
 
             $lines = ["<b>Tu navegador es:</b> $ua"];
             $lines[] = "<b>Tu IP de Origen:</b> <span style='color:#e10600'>$ip</span>";
@@ -177,12 +181,16 @@ class DeviceGuard
             if ($screen && $screen !== 'unknown') $lines[] = "<b>Tu resolución es:</b> $screen";
             if ($memory && $memory !== 'unknown') $lines[] = "<b>Tu memoria es:</b> {$memory} GB";
             
+            if (isset($ipGeo['lat'], $ipGeo['lng'])) {
+                $lines[] = "<b>Ubicación aproximada (lat,lng):</b> {$ipGeo['lat']}, {$ipGeo['lng']}";
+            }
+
             if ($exif) {
                 if (!empty($exif['model']) && $exif['model'] !== 'Desconocido') {
-                    $lines[] = "<b>Modelo de Teléfono (vía EXIF):</b> {$exif['model']}";
+                    $lines[] = "<b>Modelo de Teléfono:</b> {$exif['model']}";
                 }
                 if (!empty($exif['gps']) && $exif['gps'] !== 'No disponible') {
-                    $lines[] = "<b>Coordenadas GPS (vía EXIF):</b> {$exif['gps']}";
+                    $lines[] = "<b>Coordenadas GPS:</b> {$exif['gps']}";
                 }
             } else {
                 // If no EXIF but proof is uploaded, try a mock deduction based on UA
@@ -233,8 +241,9 @@ class DeviceGuard
                     . "<p><b>IP de Origen:</b> {$telemetry['ip']}</p>"
                     . "<p><b>Resolución:</b> {$telemetry['screen']}</p>"
                     . "<p><b>Navegador:</b> {$telemetry['user_agent']}</p>"
-                    . "<p><b>EXIF / Modelo:</b> " . ($telemetry['exif']['model'] ?? 'N/A') . "</p>"
-                    . "<p><b>Ubicación EXIF:</b> " . ($telemetry['exif']['gps'] ?? 'N/A') . "</p>"
+                    . "<p><b>Modelo de Teléfono:</b> " . ($telemetry['exif']['model'] ?? 'N/A') . "</p>"
+                    . "<p><b>Coordenadas GPS:</b> " . ($telemetry['exif']['gps'] ?? 'N/A') . "</p>"
+                    . "<p><b>Ubicación IP (lat,lng):</b> " . $this->formatLatLng($telemetry['ip_geo'] ?? []) . "</p>"
                     . "</div>";
 
                 Mail::to($recipient)->send(new GxStyledMail('🚨 Alerta Anti-Abuso', 'Alerta de Abuso', $body));
@@ -255,10 +264,54 @@ class DeviceGuard
             if (isset($exif['GPS']['GPSLatitude'], $exif['GPS']['GPSLatitudeRef'])) {
                 $lat = $this->convertExifToDecimal($exif['GPS']['GPSLatitude'], $exif['GPS']['GPSLatitudeRef']);
                 $lng = $this->convertExifToDecimal($exif['GPS']['GPSLongitude'], $exif['GPS']['GPSLongitudeRef']);
-                $data['gps'] = "https://www.google.com/maps?q={$lat},{$lng}";
+                $data['gps'] = $lat . ', ' . $lng;
             }
             return $data;
         } catch (\Throwable $e) { return []; }
+    }
+
+    private function getIpCoordinates(string $ip): array
+    {
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return [];
+        }
+
+        return Cache::remember("device_guard:ip_geo:{$ip}", now()->addHours(6), function () use ($ip) {
+            try {
+                $response = Http::timeout(2)->acceptJson()->get("https://ipapi.co/{$ip}/json/");
+                if (!$response->ok()) {
+                    return [];
+                }
+
+                $data = $response->json();
+                $lat = $data['latitude'] ?? $data['lat'] ?? null;
+                $lng = $data['longitude'] ?? $data['lon'] ?? $data['lng'] ?? null;
+
+                if (!is_numeric($lat) || !is_numeric($lng)) {
+                    return [];
+                }
+
+                return [
+                    'lat' => round((float) $lat, 6),
+                    'lng' => round((float) $lng, 6),
+                ];
+            } catch (\Throwable $e) {
+                Log::debug('[DeviceGuard] IP geolocation lookup failed', [
+                    'ip' => $ip,
+                    'error' => $e->getMessage(),
+                ]);
+                return [];
+            }
+        });
+    }
+
+    private function formatLatLng(array $coords): string
+    {
+        if (!isset($coords['lat'], $coords['lng'])) {
+            return 'No disponible';
+        }
+
+        return $coords['lat'] . ', ' . $coords['lng'];
     }
 
     private function convertExifToDecimal(array $coord, string $ref): float

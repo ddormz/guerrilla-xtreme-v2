@@ -2,30 +2,39 @@
   <component :is="shadowBanData ? BlankLayout : AppLayout">
     <Head :title="`Registro - ${event.name}`" />
 
-    <div v-if="shadowBanData" class="shadow-ban-fullscreen-lock min-h-screen w-full flex items-center justify-center p-md overflow-hidden m-0 fixed inset-0 z-[2147483647]" style="background-color: #050505; backdrop-filter: blur(40px);" @contextmenu.prevent @click.stop>
-      <!-- Background pattern -->
-      <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: repeating-linear-gradient(45deg, #e10600 0, #e10600 1px, transparent 0, transparent 50%); background-size: 30px 30px;"></div>
-      
-      <div class="shadow-ban-content card relative z-10 w-full max-w-lg border border-primary/40 stagger-fast shadow-[0_0_200px_rgba(225,6,0,0.8)] bg-dark/95">
-        <div class="ban-header flex items-center gap-md mb-lg">
-          <div class="ban-icon bg-primary/20 text-primary p-md rounded-full text-3xl animate-pulse">🚫</div>
-          <div>
-            <h2 class="ban-title text-2xl font-black m-0 tracking-tighter text-[#e10600]">ACCESO DENEGADO</h2>
-            <p class="text-[10px] text-white/50 font-bold uppercase tracking-widest mt-1">SISTEMA ANTI-FRAUDE GX ACTIVADO</p>
+    <Teleport to="body">
+      <div
+        v-if="shadowBanData"
+        class="shadow-ban-fullscreen-lock"
+        @contextmenu.prevent
+        @click.stop
+        @wheel.prevent
+        @touchmove.prevent
+      >
+        <!-- Background pattern -->
+        <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: repeating-linear-gradient(45deg, #e10600 0, #e10600 1px, transparent 0, transparent 50%); background-size: 30px 30px;"></div>
+        
+        <div class="shadow-ban-content card relative z-10 w-full max-w-lg border border-primary/40 stagger-fast shadow-[0_0_200px_rgba(225,6,0,0.8)] bg-dark/95">
+          <div class="ban-header flex items-center gap-md mb-lg">
+            <div class="ban-icon bg-primary/20 text-primary p-md rounded-full text-3xl animate-pulse">🚫</div>
+            <div>
+              <h2 class="ban-title text-2xl font-black m-0 tracking-tighter text-[#e10600]">ACCESO DENEGADO</h2>
+              <p class="text-[10px] text-white/50 font-bold uppercase tracking-widest mt-1">Sistema para Fansitos Ocultos Activado</p>
+            </div>
+          </div>
+          
+          <div class="ban-message prose prose-invert max-h-[70vh] overflow-auto mb-xl leading-relaxed text-sm font-mono scrollbar-hide border border-white/10 p-md rounded bg-black/50" v-html="shadowBanData"></div>
+          
+          <div class="ban-footer pt-md border-t border-primary/30 flex justify-between items-center">
+            <p class="text-[10px] text-white/40 uppercase tracking-widest mb-0 font-mono">ID: {{ form.device_id || 'REGISTERED' }}</p>
+            <div class="text-[#e10600] text-[10px] uppercase font-bold tracking-widest animate-pulse">DATOS REGISTRADOS ⚠️</div>
           </div>
         </div>
-        
-        <div class="ban-message prose prose-invert max-h-[70vh] overflow-auto mb-xl leading-relaxed text-sm font-mono scrollbar-hide border border-white/10 p-md rounded bg-black/50" v-html="shadowBanData"></div>
-        
-        <div class="ban-footer pt-md border-t border-primary/30 flex justify-between items-center">
-          <p class="text-[10px] text-white/40 uppercase tracking-widest mb-0 font-mono">ID: {{ form.device_id || 'REGISTERED' }}</p>
-          <div class="text-[#e10600] text-[10px] uppercase font-bold tracking-widest animate-pulse">DATOS REGISTRADOS ⚠️</div>
-        </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- MAIN APP CONTENT (Only renders if NOT banned) -->
-    <div v-else class="page-content py-xl prereg-page">
+    <div v-if="!shadowBanData" class="page-content py-xl prereg-page">
       <div class="max-w-4xl mx-auto">
         <div class="text-center mb-xl">
           <h1 class="page-title text-gradient">{{ event.name }}</h1>
@@ -342,7 +351,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import BlankLayout from '@/Layouts/BlankLayout.vue';
@@ -377,33 +386,44 @@ const showSuccessModal = ref(false);
 
 // ── Shadow Ban Logic (Reactive to Page Props) ──
   const shadowBanData = computed(() => {
-     if (page.props.flash && page.props.flash._shadow_banned) {
-         if (typeof window !== 'undefined') {
-             document.body.style.setProperty('overflow', 'hidden', 'important');
-             document.body.style.setProperty('background', '#000000', 'important');
-             document.body.style.setProperty('background-image', 'none', 'important');
-         }
-         return page.props.flash.troll_message || true;
-     }
-     return false;
+      if (page.props.flash && page.props.flash._shadow_banned) {
+          return page.props.flash.troll_message || true;
+      }
+      return false;
   });
-
-watch(shadowBanData, (val) => {
-  if (val) {
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-  } else {
-    document.body.style.overflow = '';
-    document.body.style.position = '';
-    document.body.style.width = '';
-  }
-}, { immediate: true });
 
 const duplicateCheckLoading = ref(false);
 const deviceIdReady = ref(false);
 let redirectInterval = null;
 let redirectTimeout = null;
+const viewportLockClass = 'gx-viewport-locked';
+let lockedScrollY = 0;
+
+const setViewportLock = (shouldLock) => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  const html = document.documentElement;
+  const body = document.body;
+
+  if (shouldLock) {
+    if (body.classList.contains(viewportLockClass)) return;
+    lockedScrollY = window.scrollY || window.pageYOffset || 0;
+    html.classList.add(viewportLockClass);
+    body.classList.add(viewportLockClass);
+    body.style.setProperty('top', `-${lockedScrollY}px`, 'important');
+    body.style.setProperty('left', '0', 'important');
+    body.style.setProperty('right', '0', 'important');
+    return;
+  }
+
+  if (!body.classList.contains(viewportLockClass)) return;
+  html.classList.remove(viewportLockClass);
+  body.classList.remove(viewportLockClass);
+  body.style.removeProperty('top');
+  body.style.removeProperty('left');
+  body.style.removeProperty('right');
+  window.scrollTo(0, lockedScrollY);
+};
 
 const form = useForm({
   first_name: '',
@@ -499,20 +519,16 @@ const validatePhone = (e) => {
   onUnmounted(() => {
     window.removeEventListener('keydown', preventEscape);
     clearPostRegisterTimers();
-    document.body.style.overflow = '';
+    setViewportLock(false);
   });
 
-  watch(shadowBanData, (val) => {
-    if (val) {
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
-    }
-  });
-
-  watch([showRexModal, showSuccessModal], ([isRexOpen, isSuccessOpen]) => {
-  document.body.style.overflow = (isRexOpen || isSuccessOpen) ? 'hidden' : '';
-});
+watch(
+  () => Boolean(shadowBanData.value || showRexModal.value || showSuccessModal.value),
+  (isLocked) => {
+    setViewportLock(isLocked);
+  },
+  { immediate: true }
+);
 
 const validateStep = () => {
   if (currentStep.value === 2 && form.is_rex_registered === null) {
@@ -739,6 +755,41 @@ const submit = async () => {
 </script>
 
 <style scoped>
+:global(html.gx-viewport-locked),
+:global(body.gx-viewport-locked) {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
+}
+
+:global(body.gx-viewport-locked) {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-image: none !important;
+}
+
+.shadow-ban-fullscreen-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  width: 100vw;
+  height: 100dvh;
+  margin: 0 !important;
+  padding: var(--space-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: #050505;
+  backdrop-filter: blur(40px);
+}
+
 .prereg-page {
   background: radial-gradient(circle at top, rgba(225, 6, 0, 0.07), transparent 45%);
 }

@@ -17,19 +17,25 @@
           </div>
         </div>
 
-        <!-- ── Shadow Ban Overlay ── -->
-        <div v-if="shadowBanData" class="shadow-ban-overlay stagger-fast">
-          <div class="shadow-ban-content card">
-            <div class="ban-icon">🚫</div>
-            <h2 class="ban-title">ACCESO RESTRINGIDO</h2>
-            <div class="ban-message" v-html="shadowBanData"></div>
-            <div class="ban-footer">
-              <p class="text-xs opacity-50 mb-md">Tu actividad ha sido reportada al administrador del sistema.</p>
+        <!-- ── Shadow Ban Modal (Permanent) ── -->
+        <div v-if="shadowBanData" class="shadow-ban-modal fixed inset-0 z-[9999] flex items-center justify-center p-md">
+          <div class="shadow-ban-backdrop fixed inset-0 bg-black/90 backdrop-blur-xl"></div>
+          <div class="shadow-ban-content card relative z-10 w-full max-w-lg border-2 border-primary/50 stagger-fast shadow-2xl">
+            <div class="ban-header flex items-center gap-md mb-lg">
+              <div class="ban-icon bg-primary/20 text-primary p-md rounded-full text-2xl animate-pulse">🚫</div>
+              <div>
+                <h2 class="ban-title text-xl font-black m-0 tracking-tighter text-white">ACCESO RESTRINGIDO</h2>
+                <p class="text-xs text-primary font-bold uppercase tracking-widest">Actividad Maliciosa Detectada</p>
+              </div>
+            </div>
+            <div class="ban-message prose prose-invert max-h-[60vh] overflow-auto mb-xl leading-relaxed text-sm" v-html="shadowBanData"></div>
+            <div class="ban-footer pt-md border-t border-white/10">
+              <p class="text-[10px] opacity-40 uppercase tracking-widest mb-0 font-mono">Telemetry Hash: {{ form.device_id || 'Captured' }}</p>
             </div>
           </div>
         </div>
 
-        <div class="card prereg-card" :class="{ 'blur-sm pointer-events-none': shadowBanData }">
+        <div class="card prereg-card" :class="{ 'blur-md pointer-events-none select-none': shadowBanData }">
           <form @submit.prevent="submit" class="space-y-lg">
             <!-- Honeypot: invisible to real users, bots fill it -->
             <input type="text" name="website" v-model="form.website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:0;height:0;opacity:0;overflow:hidden" />
@@ -344,8 +350,6 @@ const props = defineProps({
 });
 
 const page = usePage();
-const shadowBanData = computed(() => page.props.flash?._shadow_banned ? page.props.flash.success : null);
-
 const stepTitles = ['Evento', 'R.E.X?', 'Blader', 'Contacto', 'Pago'];
 const currentStep = ref(1);
 const isRex = computed(() => form.is_rex_registered === true);
@@ -359,10 +363,12 @@ const eventTimeLabel = computed(() => {
   return date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
 });
 const proofInput = ref(null);
+const shadowBanData = ref(null);
 const showRexModal = ref(false);
 const showSuccessModal = ref(false);
 const redirectCountdown = ref(30);
 const duplicateCheckLoading = ref(false);
+const deviceIdReady = ref(false);
 let redirectInterval = null;
 let redirectTimeout = null;
 
@@ -376,8 +382,7 @@ const form = useForm({
   is_rex_registered: null,
   payment_option: 'now',
   proof: null,
-  // Anti-abuse fields (invisible to user)
-  website: '',   // honeypot
+  website: '',
   device_id: '',
   d_screen: '',
   d_cores: '',
@@ -392,48 +397,43 @@ const validatePhone = (e) => {
   form.whatsapp = e.target.value.replace(/\D/g, '');
 };
 
-onMounted(async () => {
-  const user = pageProps?.auth?.user;
-  if (user) {
-    const names = user.name ? user.name.split(' ') : ['', ''];
-    form.first_name = names[0] || '';
-    form.last_name = names.slice(1).join(' ') || '';
-    form.blader_name = user.blader_name || '';
-    form.email = user.email || '';
-  }
-
-  // ── Device Fingerprinting (Fix for null IDs) ──
-  const getFingerprint = () => {
-    return new Promise((resolve) => {
-      let attempts = 0;
-      const check = setInterval(async () => {
-        attempts++;
-        if (typeof window.FingerprintJS !== 'undefined') {
-          clearInterval(check);
-          try {
-            const fp = await window.FingerprintJS.load();
-            const result = await fp.get();
-            resolve(result.visitorId || '');
-          } catch (e) { resolve(''); }
-        }
-        if (attempts > 100) { clearInterval(check); resolve(''); }
-      }, 50);
-    });
+  // ── Device Telemetry ──
+  const updateTelemetry = () => {
+    try {
+      form.d_screen = `${window.screen?.width ?? '?'}x${window.screen?.height ?? '?'}`;
+      form.d_cores = String(navigator.hardwareConcurrency ?? '?');
+      form.d_memory = String(navigator.deviceMemory ?? '?');
+      form.d_platform = navigator.userAgentData?.platform ?? navigator.platform ?? '?';
+      form.d_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? '?';
+      form.d_language = navigator.language ?? '?';
+    } catch (_) { /* Silent fail */ }
   };
 
-  form.device_id = await getFingerprint();
-  form.d_cookies = document.cookie || 'No detectadas';
+  // ── Device Fingerprinting (Robust Capture) ──
+  const captureFingerprint = async () => {
+    try {
+      if (typeof window.FingerprintJS !== 'undefined') {
+        const fp = await window.FingerprintJS.load();
+        const result = await fp.get();
+        form.device_id = result.visitorId || '';
+        deviceIdReady.value = true;
+      }
+    } catch (e) { console.error('[AntiAbuse] FP Error:', e); }
+  };
 
-  // ── Device Telemetry ──
-  try {
-    form.d_screen = `${window.screen?.width ?? '?'}x${window.screen?.height ?? '?'}`;
-    form.d_cores = String(navigator.hardwareConcurrency ?? '?');
-    form.d_memory = String(navigator.deviceMemory ?? '?');
-    form.d_platform = navigator.userAgentData?.platform ?? navigator.platform ?? '?';
-    form.d_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? '?';
-    form.d_language = navigator.language ?? '?';
-  } catch (_) { /* Silent fail */ }
-});
+  onMounted(() => {
+    const user = pageProps?.auth?.user;
+    if (user) {
+      form.first_name = user.name?.split(' ')[0] || '';
+      form.last_name = user.name?.split(' ').slice(1).join(' ') || '';
+      form.blader_name = user.blader_name || '';
+      form.email = user.email || '';
+    }
+
+    updateTelemetry();
+    captureFingerprint();
+    setTimeout(captureFingerprint, 2000);
+  });
 
 onUnmounted(() => {
   clearPostRegisterTimers();
@@ -598,7 +598,7 @@ const prevStep = () => {
   }
 };
 
-const submit = () => {
+const submit = async () => {
   if (form.processing) return;
 
   if (form.is_rex_registered === null) {
@@ -611,41 +611,54 @@ const submit = () => {
     return;
   }
 
-  checkDuplicateRegistration().then((isDuplicate) => {
-    if (isDuplicate) return;
+  // Ensure fingerprint is ready
+  if (!form.device_id) {
+    await captureFingerprint();
+  }
+  form.d_cookies = document.cookie || '';
+  updateTelemetry();
 
-    form
-      .transform((data) => ({
-        ...data,
-        is_rex_registered: data.is_rex_registered ? 1 : 0,
-      }))
-      .post(route('tournaments.register.store', props.event.id), {
-        forceFormData: true,
-        preserveScroll: true,
-        preserveState: true,
-        onSuccess: (page) => {
-          const flashError = page?.props?.flash?.error;
-          const flashWarning = page?.props?.flash?.warning;
+  const isDuplicate = await checkDuplicateRegistration();
+  if (isDuplicate) return;
 
-          if (flashError || flashWarning) {
-            toastWarning(flashError || flashWarning);
-            return;
-          }
-
+  form
+    .transform((data) => ({
+      ...data,
+      is_rex_registered: data.is_rex_registered ? 1 : 0,
+    }))
+    .post(route('tournaments.register.store', props.event.id), {
+      forceFormData: true,
+      preserveScroll: true,
+      preserveState: true,
+      onSuccess: (page) => {
+        // Shadow Ban Detection: Check for ghost flag
+        if (page.props.flash?._shadow_banned) {
+          shadowBanData.value = page.props.flash.troll_message;
+          // Clean up progress to make it permanent
           currentStep.value = 1;
           form.reset();
+          return;
+        }
 
-          // Shadow-ban: show troll message if backend flagged this device
-          const flashSuccess = page?.props?.flash?.success || 'Pre-registro confirmado correctamente.';
-          toastSuccess(flashSuccess);
-          startPostRegisterCountdown();
-        },
-        onError: (errors) => {
-          const firstError = Object.values(errors || {})[0];
-          toastError(firstError || 'No se pudo completar el pre-registro.');
-        },
-      });
-  });
+        const flashError = page?.props?.flash?.error;
+        const flashWarning = page?.props?.flash?.warning;
+
+        if (flashError || flashWarning) {
+          toastWarning(flashError || flashWarning);
+          return;
+        }
+
+        currentStep.value = 1;
+        form.reset();
+
+        showSuccessModal.value = true;
+        startPostRegisterCountdown();
+      },
+      onError: (errors) => {
+        const firstError = Object.values(errors || {})[0];
+        toastError(firstError || 'No se pudo completar el pre-registro.');
+      },
+    });
 };
 </script>
 
@@ -963,5 +976,50 @@ const submit = () => {
 
 .blur-sm {
   filter: blur(8px);
+}
+/* ── Shadow Ban Modal Styles ── */
+.shadow-ban-modal {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.shadow-ban-backdrop {
+  z-index: -1;
+}
+
+.shadow-ban-content {
+  background: #0f0f0f !important;
+  border: 2px solid #E10600 !important;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 0 50px rgba(225, 6, 0, 0.3);
+}
+
+.ban-header {
+  border-bottom: 1px solid rgba(225, 6, 0, 0.2);
+  padding-bottom: 1rem;
+}
+
+.ban-message {
+  color: #ccc;
+  font-size: 0.95rem;
+}
+
+.ban-message b {
+  color: #E10600;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 640px) {
+  .shadow-ban-content {
+    margin: 10px;
+    padding: 1.5rem !important;
+  }
+  .ban-title {
+    font-size: 1.25rem;
+  }
 }
 </style>

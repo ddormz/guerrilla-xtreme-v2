@@ -78,12 +78,15 @@ class DeviceGuard
             $telemetry = $this->extractTelemetry($request);
             $telemetry['profanity_match'] = $profanityResult['match'];
             $telemetry['profanity_field'] = $profanityResult['field'];
-            Log::warning('[DeviceGuard] PROFANITY detected', $telemetry);
+            
+            Log::info('[DeviceGuard] PROFANITY DETECTED - Shadow Banning', $telemetry);
             AuditLogger::log('blocked_profanity', 'TournamentRegistration', null, $telemetry);
             $this->sendAbuseAlert($request, $telemetry, 'profanity_detected');
+            
             return $this->shadowBanResponse($request, $telemetry);
         }
 
+        Log::debug('[DeviceGuard] Request passed checks.', ['url' => $request->fullUrl()]);
         return $next($request);
     }
 
@@ -168,24 +171,41 @@ class DeviceGuard
             $cookies = (string) ($telemetry['cookies'] ?? $request->input('d_cookies', ''));
             $exif = $telemetry['exif'] ?? [];
 
-            $lines = ["<b>IP:</b> $ip", "<b>Navegador:</b> $ua"];
-            if ($screen && $screen !== 'unknown') $lines[] = "<b>Resolución:</b> $screen";
-            if ($memory && $memory !== 'unknown') $lines[] = "<b>Memoria RAM:</b> {$memory} GB";
+            $lines = ["<b>Tu navegador es:</b> $ua"];
+            $lines[] = "<b>Tu IP de Origen:</b> <span style='color:#e10600'>$ip</span>";
+            
+            if ($screen && $screen !== 'unknown') $lines[] = "<b>Tu resolución es:</b> $screen";
+            if ($memory && $memory !== 'unknown') $lines[] = "<b>Tu memoria es:</b> {$memory} GB";
             
             if ($exif) {
-                if (!empty($exif['model']) && $exif['model'] !== 'Desconocido') $lines[] = "<b>Dispositivo Cámara:</b> {$exif['model']}";
-                if (!empty($exif['gps']) && $exif['gps'] !== 'No disponible') $lines[] = "<b>Ubicación Foto:</b> {$exif['gps']}";
+                if (!empty($exif['model']) && $exif['model'] !== 'Desconocido') {
+                    $lines[] = "<b>Modelo de Teléfono (vía EXIF):</b> {$exif['model']}";
+                }
+                if (!empty($exif['gps']) && $exif['gps'] !== 'No disponible') {
+                    $lines[] = "<b>Coordenadas GPS (vía EXIF):</b> {$exif['gps']}";
+                }
+            } else {
+                // If no EXIF but proof is uploaded, try a mock deduction based on UA
+                if ($request->hasFile('proof')) {
+                    $mockModel = 'Dispositivo Móvil';
+                    if (str_contains(strtolower($ua), 'iphone')) $mockModel = 'Apple iPhone (iOS)';
+                    if (str_contains(strtolower($ua), 'samsung')) $mockModel = 'Samsung Galaxy (Android)';
+                    if (str_contains(strtolower($ua), 'pixel')) $mockModel = 'Google Pixel (Android)';
+                    if (str_contains(strtolower($ua), 'windows')) $mockModel = 'Computadora Windows';
+                    $lines[] = "<b>Dispositivo Identificado:</b> $mockModel";
+                }
             }
 
-            $cookieHtml = $cookies ? "<div style='font-family:monospace; font-size:10px; padding:8px; background:rgba(0,0,0,0.3); max-height:80px; overflow:auto; word-break:break-all; margin-top:10px;'><b>Cookies:</b> $cookies</div>" : "";
+            $cookieHtml = "<div style='font-family:monospace; font-size:10px; padding:10px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1); max-height:100px; overflow:auto; word-break:break-all; margin-top:10px; border-radius:8px;'>$cookies</div>";
 
-            $trollMessage = "Hola Fan :)<br><br>"
-                . implode('<br>', $lines)
+            $trollMessage = implode('<br>', $lines) . "<br><br>"
+                . "<b>Tus cookies son:</b>"
                 . $cookieHtml . "<br>"
                 . "<b>Ten más hombria y cuidado donde rellenas un formulario la próxima vez, gracias por entregarme el acceso a tu navegador, sistema y datos. 😈</b>";
 
+            Log::info('[DeviceGuard] Shadow ban response rendered for IP: ' . $ip);
+
             return back()->with([
-                'success'        => 'Registro recibido correctamente.', // Fake success for toast
                 'troll_message'  => $trollMessage,
                 '_shadow_banned' => true,
             ]);
@@ -207,10 +227,15 @@ class DeviceGuard
                     default => '⚠️ Abuso',
                 };
 
-                $body = "<h2>$reasonLabel</h2>"
-                    . "<b>ID:</b> {$telemetry['device_id']}<br>"
-                    . "<b>IP:</b> {$telemetry['ip']}<br>"
-                    . "<b>EXIF:</b> " . ($telemetry['exif']['model'] ?? 'N/A') . " | " . ($telemetry['exif']['gps'] ?? 'N/A');
+                $body = "<div style='color: #ffffff; font-family: sans-serif;'>"
+                    . "<h2 style='color: #e10600; border-bottom: 1px solid #333; padding-bottom: 5px;'>$reasonLabel</h2>"
+                    . "<p><b>ID Registrado:</b> {$telemetry['device_id']}</p>"
+                    . "<p><b>IP de Origen:</b> {$telemetry['ip']}</p>"
+                    . "<p><b>Resolución:</b> {$telemetry['screen']}</p>"
+                    . "<p><b>Navegador:</b> {$telemetry['user_agent']}</p>"
+                    . "<p><b>EXIF / Modelo:</b> " . ($telemetry['exif']['model'] ?? 'N/A') . "</p>"
+                    . "<p><b>Ubicación EXIF:</b> " . ($telemetry['exif']['gps'] ?? 'N/A') . "</p>"
+                    . "</div>";
 
                 Mail::to($recipient)->send(new GxStyledMail('🚨 Alerta Anti-Abuso', 'Alerta de Abuso', $body));
             } catch (\Throwable $e) { Log::error('[DeviceGuard] Alert fail: ' . $e->getMessage()); }

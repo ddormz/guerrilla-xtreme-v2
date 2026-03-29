@@ -92,8 +92,8 @@ class LeagueController extends Controller
                 ->first()
             : null;
 
-        $totalCollected = (float) ($collectionSummary?->paid_total ?? 0);
-        $pendingCollected = (float) ($collectionSummary?->pending_total ?? 0);
+        $totalCollected = $collectionSummary ? (float) $collectionSummary->paid_total : 0.0;
+        $pendingCollected = $collectionSummary ? (float) $collectionSummary->pending_total : 0.0;
 
         $upcomingEvents = $activeSeason
             ? LeagueEvent::where('season_id', $activeSeason->id)
@@ -247,7 +247,7 @@ class LeagueController extends Controller
         ]);
     }
 
-    public function storeRegistration(Request $request, LeagueEvent $event)
+    public function storeRegistration(LeagueEvent $event, Request $request)
     {
         $isRexRegistered = $request->boolean('is_rex_registered');
         $requiresContactData = !$isRexRegistered;

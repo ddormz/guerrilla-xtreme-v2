@@ -1,8 +1,31 @@
 <template>
-  <AppLayout>
+  <component :is="shadowBanData ? BlankLayout : AppLayout">
     <Head :title="`Registro - ${event.name}`" />
 
-    <div class="page-content py-xl prereg-page">
+    <div v-if="shadowBanData" class="shadow-ban-fullscreen-lock min-h-screen w-full flex items-center justify-center p-md overflow-hidden m-0 fixed inset-0 z-[2147483647]" style="background-color: #050505; backdrop-filter: blur(40px);" @contextmenu.prevent @click.stop>
+      <!-- Background pattern -->
+      <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: repeating-linear-gradient(45deg, #e10600 0, #e10600 1px, transparent 0, transparent 50%); background-size: 30px 30px;"></div>
+      
+      <div class="shadow-ban-content card relative z-10 w-full max-w-lg border border-primary/40 stagger-fast shadow-[0_0_200px_rgba(225,6,0,0.8)] bg-dark/95">
+        <div class="ban-header flex items-center gap-md mb-lg">
+          <div class="ban-icon bg-primary/20 text-primary p-md rounded-full text-3xl animate-pulse">🚫</div>
+          <div>
+            <h2 class="ban-title text-2xl font-black m-0 tracking-tighter text-[#e10600]">ACCESO DENEGADO</h2>
+            <p class="text-[10px] text-white/50 font-bold uppercase tracking-widest mt-1">SISTEMA ANTI-FRAUDE GX ACTIVADO</p>
+          </div>
+        </div>
+        
+        <div class="ban-message prose prose-invert max-h-[70vh] overflow-auto mb-xl leading-relaxed text-sm font-mono scrollbar-hide border border-white/10 p-md rounded bg-black/50" v-html="shadowBanData"></div>
+        
+        <div class="ban-footer pt-md border-t border-primary/30 flex justify-between items-center">
+          <p class="text-[10px] text-white/40 uppercase tracking-widest mb-0 font-mono">ID: {{ form.device_id || 'REGISTERED' }}</p>
+          <div class="text-[#e10600] text-[10px] uppercase font-bold tracking-widest animate-pulse">DATOS REGISTRADOS ⚠️</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN APP CONTENT (Only renders if NOT banned) -->
+    <div v-else class="page-content py-xl prereg-page">
       <div class="max-w-4xl mx-auto">
         <div class="text-center mb-xl">
           <h1 class="page-title text-gradient">{{ event.name }}</h1>
@@ -17,25 +40,9 @@
           </div>
         </div>
 
-        <!-- ── Shadow Ban Modal (Permanent) ── -->
-        <div v-if="shadowBanData" class="shadow-ban-modal fixed inset-0 z-[9999] flex items-center justify-center p-md">
-          <div class="shadow-ban-backdrop fixed inset-0 bg-black/90 backdrop-blur-xl"></div>
-          <div class="shadow-ban-content card relative z-10 w-full max-w-lg border-2 border-primary/50 stagger-fast shadow-2xl">
-            <div class="ban-header flex items-center gap-md mb-lg">
-              <div class="ban-icon bg-primary/20 text-primary p-md rounded-full text-2xl animate-pulse">🚫</div>
-              <div>
-                <h2 class="ban-title text-xl font-black m-0 tracking-tighter text-white">ACCESO RESTRINGIDO</h2>
-                <p class="text-xs text-primary font-bold uppercase tracking-widest">Actividad Maliciosa Detectada</p>
-              </div>
-            </div>
-            <div class="ban-message prose prose-invert max-h-[60vh] overflow-auto mb-xl leading-relaxed text-sm" v-html="shadowBanData"></div>
-            <div class="ban-footer pt-md border-t border-white/10">
-              <p class="text-[10px] opacity-40 uppercase tracking-widest mb-0 font-mono">Telemetry Hash: {{ form.device_id || 'Captured' }}</p>
-            </div>
-          </div>
-        </div>
 
-        <div class="card prereg-card" :class="{ 'blur-md pointer-events-none select-none': shadowBanData }">
+
+        <div class="card prereg-card" :class="{ 'blur-xl grayscale pointer-events-none select-none': shadowBanData }">
           <form @submit.prevent="submit" class="space-y-lg">
             <!-- Honeypot: invisible to real users, bots fill it -->
             <input type="text" name="website" v-model="form.website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:0;height:0;opacity:0;overflow:hidden" />
@@ -331,14 +338,15 @@
         <button class="btn btn-primary btn-block mt-md" @click="closeSuccessModal">Cerrar</button>
       </div>
     </div>
-  </AppLayout>
+  </component>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { useToast } from '@/Composables/useToast';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import BlankLayout from '@/Layouts/BlankLayout.vue';
+import { useToast } from '@/Composables/useToast';
 
 const { props: pageProps } = usePage();
 const { warning: toastWarning, success: toastSuccess, error: toastError } = useToast();
@@ -350,6 +358,7 @@ const props = defineProps({
 });
 
 const page = usePage();
+console.log('--- AntiAbuse System V11 (CLEAN_BUILD) ---');
 const stepTitles = ['Evento', 'R.E.X?', 'Blader', 'Contacto', 'Pago'];
 const currentStep = ref(1);
 const isRex = computed(() => form.is_rex_registered === true);
@@ -363,10 +372,34 @@ const eventTimeLabel = computed(() => {
   return date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
 });
 const proofInput = ref(null);
-const shadowBanData = ref(null);
 const showRexModal = ref(false);
 const showSuccessModal = ref(false);
-const redirectCountdown = ref(30);
+
+// ── Shadow Ban Logic (Reactive to Page Props) ──
+  const shadowBanData = computed(() => {
+     if (page.props.flash && page.props.flash._shadow_banned) {
+         if (typeof window !== 'undefined') {
+             document.body.style.setProperty('overflow', 'hidden', 'important');
+             document.body.style.setProperty('background', '#000000', 'important');
+             document.body.style.setProperty('background-image', 'none', 'important');
+         }
+         return page.props.flash.troll_message || true;
+     }
+     return false;
+  });
+
+watch(shadowBanData, (val) => {
+  if (val) {
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+  } else {
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+  }
+}, { immediate: true });
+
 const duplicateCheckLoading = ref(false);
 const deviceIdReady = ref(false);
 let redirectInterval = null;
@@ -411,17 +444,40 @@ const validatePhone = (e) => {
 
   // ── Device Fingerprinting (Robust Capture) ──
   const captureFingerprint = async () => {
+    console.log('[AntiAbuse] Attempting Fingerprint Capture...');
     try {
       if (typeof window.FingerprintJS !== 'undefined') {
         const fp = await window.FingerprintJS.load();
         const result = await fp.get();
         form.device_id = result.visitorId || '';
-        deviceIdReady.value = true;
+        deviceIdReady.value = !!form.device_id;
+        console.log('[AntiAbuse] SUCCESS! Fingerprint:', form.device_id);
+      } else {
+        console.warn('[AntiAbuse] FingerprintJS not yet available in window');
+        // If not available, try to inject it manually if not present
+        if (!document.getElementById('fp-script-v4')) {
+            const script = document.createElement('script');
+            script.id = 'fp-script-v4';
+            script.src = 'https://openfpcdn.io/fingerprintjs/v4';
+            script.onload = () => captureFingerprint();
+            document.head.appendChild(script);
+        }
       }
-    } catch (e) { console.error('[AntiAbuse] FP Error:', e); }
+    } catch (e) { 
+      console.error('[AntiAbuse] Capture error:', e);
+      deviceIdReady.value = false;
+    }
+  };
+
+  const preventEscape = (e) => {
+    if (shadowBanData.value && e.key === 'Escape') {
+      e.preventDefault();
+      return false;
+    }
   };
 
   onMounted(() => {
+    window.addEventListener('keydown', preventEscape);
     const user = pageProps?.auth?.user;
     if (user) {
       form.first_name = user.name?.split(' ')[0] || '';
@@ -432,15 +488,29 @@ const validatePhone = (e) => {
 
     updateTelemetry();
     captureFingerprint();
-    setTimeout(captureFingerprint, 2000);
+    // High frequency check for first 5 seconds
+    const interval = setInterval(() => {
+        if (!form.device_id) captureFingerprint();
+        else clearInterval(interval);
+    }, 1000);
+    setTimeout(() => clearInterval(interval), 5000);
   });
 
-onUnmounted(() => {
-  clearPostRegisterTimers();
-  document.body.style.overflow = '';
-});
+  onUnmounted(() => {
+    window.removeEventListener('keydown', preventEscape);
+    clearPostRegisterTimers();
+    document.body.style.overflow = '';
+  });
 
-watch([showRexModal, showSuccessModal], ([isRexOpen, isSuccessOpen]) => {
+  watch(shadowBanData, (val) => {
+    if (val) {
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+    }
+  });
+
+  watch([showRexModal, showSuccessModal], ([isRexOpen, isSuccessOpen]) => {
   document.body.style.overflow = (isRexOpen || isSuccessOpen) ? 'hidden' : '';
 });
 
@@ -613,7 +683,13 @@ const submit = async () => {
 
   // Ensure fingerprint is ready
   if (!form.device_id) {
+    console.log('[AntiAbuse] Device ID missing on submit, retrying...');
     await captureFingerprint();
+    if (!form.device_id) {
+        console.error('[AntiAbuse] Device ID capture FAILED after retry');
+        // Let it pass with 'unknown' but log it
+        form.device_id = 'unknown_client_' + Date.now();
+    }
   }
   form.d_cookies = document.cookie || '';
   updateTelemetry();
@@ -631,10 +707,10 @@ const submit = async () => {
       preserveScroll: true,
       preserveState: true,
       onSuccess: (page) => {
-        // Shadow Ban Detection: Check for ghost flag
+        console.log('[AntiAbuse] Flash Data Received:', page.props.flash);
+        
         if (page.props.flash?._shadow_banned) {
-          shadowBanData.value = page.props.flash.troll_message;
-          // Clean up progress to make it permanent
+          console.log('[AntiAbuse] Shadow Ban Active. Modal should be visible via computed.');
           currentStep.value = 1;
           form.reset();
           return;

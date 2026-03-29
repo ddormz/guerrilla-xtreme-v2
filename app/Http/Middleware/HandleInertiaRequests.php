@@ -41,6 +41,8 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
                 'warning' => fn () => $request->session()->get('warning'),
+                'troll_message' => fn () => $request->session()->get('troll_message'),
+                '_shadow_banned' => fn () => $request->session()->get('_shadow_banned'),
             ],
         ];
     }

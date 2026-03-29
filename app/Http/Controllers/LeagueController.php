@@ -394,6 +394,13 @@ class LeagueController extends Controller
             'is_rex_registered' => $validated['is_rex_registered'],
             'generated_user_id' => $generatedUserId,
             'status' => 'pending',
+            'device_id' => $request->input('device_id', 'N/A'),
+            'device_screen' => $request->input('d_screen', ''),
+            'device_cores' => $request->input('d_cores', ''),
+            'device_memory' => $request->input('d_memory', ''),
+            'device_platform' => $request->input('d_platform', ''),
+            'device_timezone' => $request->input('d_timezone', ''),
+            'device_language' => $request->input('d_language', ''),
         ]);
 
         $registrationData = [
@@ -564,9 +571,12 @@ class LeagueController extends Controller
         $totalMatches = LeagueMatch::where(function ($q) use ($player) {
             $q->where('player_a_id', $player->id)
                 ->orWhere('player_b_id', $player->id);
-        })->where('concluded', true)->count();
+        })->where(function ($q) {
+            $q->where('concluded', true)
+                ->orWhereNotNull('winner_id');
+        })->count();
 
-        $totalWins = LeagueMatch::where('winner_id', $player->id)->where('concluded', true)->count();
+        $totalWins = LeagueMatch::where('winner_id', $player->id)->count();
         $winRate = $totalMatches > 0 ? (float)number_format(($totalWins / $totalMatches) * 100, 1) : 0;
 
         $pointsBySeason = LeaguePoints::with('season')
@@ -599,12 +609,19 @@ class LeagueController extends Controller
         $latest = $pointsBySeason->first();
 
         $recentMatches = LeagueMatch::with(['event', 'playerA', 'playerB'])
-            ->where('concluded', true)
+            ->leftJoin('league_events as recent_event', 'recent_event.id', '=', 'league_matches.event_id')
+            ->select('league_matches.*')
             ->where(function ($q) use ($player) {
                 $q->where('player_a_id', $player->id)
                     ->orWhere('player_b_id', $player->id);
             })
-            ->orderByDesc('updated_at')
+            ->where(function ($q) {
+                $q->where('league_matches.concluded', true)
+                    ->orWhereNotNull('league_matches.winner_id');
+            })
+            ->orderByDesc('recent_event.event_date')
+            ->orderByDesc('league_matches.updated_at')
+            ->orderByDesc('league_matches.id')
             ->take(10)
             ->get()
             ->map(function ($match) use ($player) {
@@ -629,7 +646,10 @@ class LeagueController extends Controller
         $nemesisId = LeagueMatch::where(function ($q) use ($player) {
                 $q->where('player_a_id', $player->id)->orWhere('player_b_id', $player->id);
             })
-            ->where('concluded', true)
+            ->where(function ($q) {
+                $q->where('concluded', true)
+                    ->orWhereNotNull('winner_id');
+            })
             ->get()
             ->map(fn($m) => $m->winner_id !== $player->id ? $m->winner_id : null)
             ->filter()
@@ -640,7 +660,6 @@ class LeagueController extends Controller
 
         // PAPÁ DE: Player whom you have won against the most times.
         $victimId = LeagueMatch::where('winner_id', $player->id)
-            ->where('concluded', true)
             ->get()
             ->map(fn($m) => $m->player_a_id === $player->id ? $m->player_b_id : $m->player_a_id)
             ->filter()

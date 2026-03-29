@@ -18,6 +18,7 @@
                   <th>Acción</th>
                   <th>Entidad</th>
                   <th>ID</th>
+                  <th>Device ID</th>
                   <th>Fecha</th>
                   <th>IP</th>
                   <th>Acciones</th>
@@ -35,6 +36,7 @@
                   </td>
                   <td>{{ log.entity_type }}</td>
                   <td><code>#{{ log.entity_id || '-' }}</code></td>
+                  <td class="text-xs font-mono" :class="log.device_id && log.device_id !== 'N/A' ? 'text-amber-400' : 'text-secondary'">{{ log.device_id || '-' }}</td>
                   <td class="text-sm">{{ log.date }}</td>
                   <td class="text-xs text-secondary font-mono">{{ log.ip }}</td>
                   <td>
@@ -43,7 +45,7 @@
                   </td>
                 </tr>
                 <tr v-if="logs.data.length === 0">
-                  <td colspan="7" class="text-center py-xl text-secondary">No hay registros de auditoría</td>
+                  <td colspan="8" class="text-center py-xl text-secondary">No hay registros de auditoría</td>
                 </tr>
               </tbody>
             </table>
@@ -115,6 +117,9 @@ const formatAction = (action) => {
 .action-badge.delete_user { background: rgba(225, 6, 0, 0.1); color: var(--gx-red); }
 .action-badge.update_role { background: rgba(30, 64, 175, 0.1); color: #1e40af; }
 .action-badge.update_user { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.action-badge.register_tournament { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.action-badge.blocked_device { background: rgba(225, 6, 0, 0.2); color: #f87171; }
+.action-badge.blocked_profanity { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
 
 .payload-box {
   background: #1a1a1a;

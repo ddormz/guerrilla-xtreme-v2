@@ -117,29 +117,77 @@ class RefereeController extends Controller
 
         try {
             $type = MatchActionType::from($validated['action_type']);
-            $this->refereeService->addAction($match, $validated['side'], $type, auth()->id());
+            $updatedMatch = $this->refereeService->addAction($match, $validated['side'], $type, auth()->id());
+
+            if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Acción registrada.',
+                    ...$this->buildPanelPayload($updatedMatch),
+                ]);
+            }
+
             return back();
         } catch (\Exception $e) {
+            if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
             return back()->with('error', $e->getMessage());
         }
     }
 
-    public function undoAction(LeagueMatch $match)
+    public function undoAction(Request $request, LeagueMatch $match)
     {
         try {
-            $this->refereeService->undoLastAction($match);
+            $updatedMatch = $this->refereeService->undoLastAction($match);
+
+            if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Última acción deshecha.',
+                    ...$this->buildPanelPayload($updatedMatch),
+                ]);
+            }
+
             return back();
         } catch (\Exception $e) {
+            if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
             return back()->with('error', $e->getMessage());
         }
     }
 
-    public function resetMatch(LeagueMatch $match)
+    public function resetMatch(Request $request, LeagueMatch $match)
     {
         try {
-            $this->refereeService->resetMatch($match);
+            $updatedMatch = $this->refereeService->resetMatch($match);
+
+            if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Match reiniciado.',
+                    ...$this->buildPanelPayload($updatedMatch),
+                ]);
+            }
+
             return back()->with('success', 'Match reiniciado.');
         } catch (\Exception $e) {
+            if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
             return back()->with('error', $e->getMessage());
         }
     }
@@ -200,5 +248,34 @@ class RefereeController extends Controller
             'match' => $match,
             'actions' => $actionsData
         ]);
+    }
+
+    private function buildPanelPayload(LeagueMatch $match): array
+    {
+        $actions = MatchAction::query()
+            ->where('match_id', $match->id)
+            ->orderBy('created_at', 'asc')
+            ->get(['id', 'side', 'action_type', 'created_at']);
+
+        return [
+            'match' => [
+                'id' => $match->id,
+                'score_a' => $match->score_a,
+                'score_b' => $match->score_b,
+                'spin_a' => $match->spin_a,
+                'spin_b' => $match->spin_b,
+                'over_a' => $match->over_a,
+                'over_b' => $match->over_b,
+                'burst_a' => $match->burst_a,
+                'burst_b' => $match->burst_b,
+                'xtreme_a' => $match->xtreme_a,
+                'xtreme_b' => $match->xtreme_b,
+                'strikes_a' => $match->strikes_a,
+                'strikes_b' => $match->strikes_b,
+                'winner_id' => $match->winner_id,
+                'concluded' => (bool) $match->concluded,
+            ],
+            'actions' => $actions,
+        ];
     }
 }

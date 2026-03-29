@@ -35,12 +35,12 @@
           <table class="data-table w-full text-sm">
             <thead>
               <tr>
-                <th>Fecha/Hora</th>
-                <th>Usuario</th>
+                <th>Actuante</th>
                 <th>Acción</th>
                 <th>Entidad</th>
-                <th>ID</th>
-                <th>IP / Dispositivo</th>
+                <th>ID ENTIDAD</th>
+                <th>Device ID</th>
+                <th>IP / Red</th>
                 <th class="text-right">Detalles</th>
               </tr>
             </thead>
@@ -57,6 +57,9 @@
                 </td>
                 <td class="text-secondary">{{ log.entity_type }}</td>
                 <td class="font-mono text-xs opacity-50">#{{ log.entity_id || '-' }}</td>
+                <td class="text-xs font-mono" :class="log.device_id && log.device_id !== 'N/A' ? 'text-amber-400' : 'text-secondary'">
+                  {{ log.device_id || '-' }}
+                </td>
                 <td class="text-[10px] text-secondary">
                   <div class="truncate max-w-[150px]" :title="log.user_agent">
                     {{ log.ip_address }} / {{ log.user_agent }}
@@ -158,14 +161,17 @@ const actionLabels = {
   generate_matches: 'Generó partidas',
   assign_referee: 'Asignó árbitro',
   finalize_match: 'Finalizó partida',
+  register_tournament: 'Preinspección Torneo',
+  blocked_device: '🚫 Dispositivo bloqueado',
+  blocked_profanity: '🤬 Profanidad/Insultos',
 };
 
 const humanAction = (action) => actionLabels[action] || action.replace(/_/g, ' ');
 
 const getActionClass = (action) => {
-  if (action.includes('create') || action.includes('approve')) return 'badge-green';
+  if (action.includes('create') || action.includes('approve') || action.includes('register')) return 'badge-green';
   if (action.includes('update') || action.includes('assign') || action.includes('generate') || action.includes('finalize')) return 'badge-orange';
-  if (action.includes('delete')) return 'badge-red';
+  if (action.includes('delete') || action.includes('blocked')) return 'badge-red';
   return 'badge-gray';
 };
 </script>

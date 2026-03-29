@@ -52,6 +52,7 @@ class AdminController extends Controller
                 'entity_type' => $log->entity_type,
                 'entity_id' => $log->entity_id,
                 'payload' => $log->payload_json,
+                'device_id' => $log->payload_json['device_id'] ?? null,
                 'ip' => $log->ip_address,
                 'date' => $log->created_at->format('d/m/Y H:i:s'),
             ]);

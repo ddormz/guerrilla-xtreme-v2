@@ -16,7 +16,8 @@ class AdminAuditController extends Controller
         if ($request->filled('search')) {
             $query->where(function($q) use ($request) {
                 $q->where('action', 'like', "%{$request->search}%")
-                  ->orWhere('entity_type', 'like', "%{$request->search}%");
+                  ->orWhere('entity_type', 'like', "%{$request->search}%")
+                  ->orWhere('payload_json->device_id', 'like', "%{$request->search}%");
             });
         }
 
@@ -26,7 +27,22 @@ class AdminAuditController extends Controller
 
         $logs = $query->orderBy('created_at', 'desc')
             ->paginate(20)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn($log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'entity_type' => $log->entity_type,
+                'entity_id' => $log->entity_id,
+                'payload_json' => $log->payload_json,
+                'device_id' => $log->payload_json['device_id'] ?? null,
+                'ip_address' => $log->ip_address,
+                'user_agent' => $log->user_agent,
+                'created_at' => $log->created_at,
+                'actor' => $log->actor ? [
+                    'id' => $log->actor->id,
+                    'name' => $log->actor->name,
+                ] : null,
+            ]);
 
         return Inertia::render('Admin/Audit/Index', [
             'logs' => $logs,

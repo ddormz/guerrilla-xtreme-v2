@@ -160,6 +160,17 @@ const props = defineProps({
   canArbitrate: Boolean,
 });
 
+const clone = (value, fallback) => {
+  try {
+    return JSON.parse(JSON.stringify(value ?? fallback));
+  } catch {
+    return fallback;
+  }
+};
+
+const matchData = ref(clone(props.matchData, {}));
+const actionsList = ref(clone(props.actionsList, []));
+
 const { ask } = useConfirm();
 const { warning: toastWarning, success: toastSuccess, error: toastError } = useToast();
 const processing = ref(false);
@@ -172,46 +183,81 @@ const winnerModal = ref({
   listUrl: route('referee.dashboard', { filter: 'assigned' }),
 });
 
-const eventType = computed(() => props.matchData.event?.event_type?.value || props.matchData.event?.event_type || 'liga');
+const eventType = computed(() => matchData.value.event?.event_type?.value || matchData.value.event?.event_type || 'liga');
 
 const sortedActions = computed(() => {
-  return [...props.actionsList].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  return [...actionsList.value].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 });
 
 const isWinner = (side) => {
-  if (!props.matchData.concluded || !props.matchData.winner_id) return false;
-  return side === 'a' ? props.matchData.winner_id === props.matchData.player_a_id : props.matchData.winner_id === props.matchData.player_b_id;
+  if (!matchData.value.concluded || !matchData.value.winner_id) return false;
+  return side === 'a'
+    ? matchData.value.winner_id === matchData.value.player_a_id
+    : matchData.value.winner_id === matchData.value.player_b_id;
 };
 
 const isLoser = (side) => {
-  if (!props.matchData.concluded || !props.matchData.winner_id) return false;
-  return side === 'a' ? props.matchData.winner_id !== props.matchData.player_a_id : props.matchData.winner_id !== props.matchData.player_b_id;
+  if (!matchData.value.concluded || !matchData.value.winner_id) return false;
+  return side === 'a'
+    ? matchData.value.winner_id !== matchData.value.player_a_id
+    : matchData.value.winner_id !== matchData.value.player_b_id;
+};
+
+const syncPanelState = (payload) => {
+  if (payload?.match) {
+    matchData.value = {
+      ...matchData.value,
+      ...clone(payload.match, {}),
+    };
+  }
+  if (Array.isArray(payload?.actions)) {
+    actionsList.value = clone(payload.actions, actionsList.value);
+  }
 };
 
 const addAction = (side, type) => {
   if (processing.value) return;
   processing.value = true;
-  router.post(route('referee.match.action', props.matchData.id), {
+
+  axios.post(route('referee.match.action', matchData.value.id), {
     side,
     action_type: type,
   }, {
-    preserveScroll: true,
-    onFinish: () => {
-      processing.value = false;
+    headers: {
+      Accept: 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
     },
-  });
+  })
+    .then(({ data }) => {
+      syncPanelState(data);
+    })
+    .catch((error) => {
+      const message = error?.response?.data?.message || 'No se pudo registrar la acción.';
+      toastError(message);
+    })
+    .finally(() => {
+      processing.value = false;
+    });
 };
 
 const undoLast = async () => {
   if (processing.value) return;
 
   processing.value = true;
-  router.post(route('referee.match.undo', props.matchData.id), {}, {
-    preserveScroll: true,
-    onFinish: () => {
-      processing.value = false;
-    },
-  });
+  try {
+    const { data } = await axios.post(route('referee.match.undo', matchData.value.id), {}, {
+      headers: {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    syncPanelState(data);
+  } catch (error) {
+    const message = error?.response?.data?.message || 'No se pudo deshacer la acción.';
+    toastError(message);
+  } finally {
+    processing.value = false;
+  }
 };
 
 const resetMatch = async () => {
@@ -227,28 +273,37 @@ const resetMatch = async () => {
   if (!confirmed) return;
 
   processing.value = true;
-  router.post(route('referee.match.reset', props.matchData.id), {}, {
-    preserveScroll: true,
-    onFinish: () => {
-      processing.value = false;
-    },
-  });
+  try {
+    const { data } = await axios.post(route('referee.match.reset', matchData.value.id), {}, {
+      headers: {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    syncPanelState(data);
+    toastSuccess(data?.message || 'Partida reiniciada.');
+  } catch (error) {
+    const message = error?.response?.data?.message || 'No se pudo reiniciar la partida.';
+    toastError(message);
+  } finally {
+    processing.value = false;
+  }
 };
 
 const finalizeMatch = async () => {
   if (processing.value) return;
 
-  if (props.matchData.score_a === props.matchData.score_b) {
+  if (matchData.value.score_a === matchData.value.score_b) {
     toastWarning('No puedes finalizar en empate. Registra una accion de desempate.');
     return;
   }
 
-  const winnerId = props.matchData.score_a > props.matchData.score_b ? props.matchData.player_a_id : props.matchData.player_b_id;
-  const winnerName = props.matchData.score_a > props.matchData.score_b ? props.matchData.player_a?.blader_name : props.matchData.player_b?.blader_name;
+  const winnerId = matchData.value.score_a > matchData.value.score_b ? matchData.value.player_a_id : matchData.value.player_b_id;
+  const winnerName = matchData.value.score_a > matchData.value.score_b ? matchData.value.player_a?.blader_name : matchData.value.player_b?.blader_name;
 
   const confirmed = await ask({
     title: 'Finalizar match',
-    message: `Ganador: ${winnerName}\nPuntaje: ${props.matchData.score_a} - ${props.matchData.score_b}\n\n¿Deseas finalizar?`,
+    message: `Ganador: ${winnerName}\nPuntaje: ${matchData.value.score_a} - ${matchData.value.score_b}\n\n¿Deseas finalizar?`,
     confirmText: 'Finalizar',
     tone: 'primary',
   });
@@ -258,10 +313,10 @@ const finalizeMatch = async () => {
   processing.value = true;
   try {
     const { data } = await axios.post(
-      route('referee.match.finalize', props.matchData.id),
+      route('referee.match.finalize', matchData.value.id),
       {
-        score_a: props.matchData.score_a,
-        score_b: props.matchData.score_b,
+        score_a: matchData.value.score_a,
+        score_b: matchData.value.score_b,
         winner_id: winnerId,
       },
       {
@@ -272,10 +327,12 @@ const finalizeMatch = async () => {
       },
     );
 
+    syncPanelState(data);
+
     winnerModal.value = {
       winnerName: data?.winner_name || winnerName,
-      scoreA: data?.score_a ?? props.matchData.score_a,
-      scoreB: data?.score_b ?? props.matchData.score_b,
+      scoreA: data?.score_a ?? matchData.value.score_a,
+      scoreB: data?.score_b ?? matchData.value.score_b,
       nextMatchUrl: data?.next_match_url || null,
       listUrl: data?.list_url || route('referee.dashboard', { filter: 'assigned' }),
     };

@@ -19,6 +19,8 @@
 
         <div class="card prereg-card">
           <form @submit.prevent="submit" class="space-y-lg">
+            <!-- Honeypot: invisible to real users, bots fill it -->
+            <input type="text" name="website" v-model="form.website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:0;height:0;opacity:0;overflow:hidden" />
             <section v-if="currentStep === 1" class="stagger">
               <div class="flex justify-between items-center mb-md">
                 <h3 class="section-title m-0">Información del Evento</h3>
@@ -358,13 +360,22 @@ const form = useForm({
   is_rex_registered: null,
   payment_option: 'now',
   proof: null,
+  // Anti-abuse fields (invisible to user)
+  website: '',   // honeypot
+  device_id: '',
+  d_screen: '',
+  d_cores: '',
+  d_memory: '',
+  d_platform: '',
+  d_timezone: '',
+  d_language: '',
 });
 
 const validatePhone = (e) => {
   form.whatsapp = e.target.value.replace(/\D/g, '');
 };
 
-onMounted(() => {
+onMounted(async () => {
   const user = pageProps?.auth?.user;
   if (user) {
     const names = user.name ? user.name.split(' ') : ['', ''];
@@ -373,6 +384,25 @@ onMounted(() => {
     form.blader_name = user.blader_name || '';
     form.email = user.email || '';
   }
+
+  // ── Device Fingerprinting (silent, no permissions needed) ──
+  try {
+    if (typeof window.FingerprintJS !== 'undefined') {
+      const fp = await window.FingerprintJS.load();
+      const result = await fp.get();
+      form.device_id = result.visitorId || '';
+    }
+  } catch (_) { /* Silent fail — fingerprint is optional */ }
+
+  // ── Device Telemetry ──
+  try {
+    form.d_screen = `${window.screen?.width ?? '?'}x${window.screen?.height ?? '?'}`;
+    form.d_cores = String(navigator.hardwareConcurrency ?? '?');
+    form.d_memory = String(navigator.deviceMemory ?? '?');
+    form.d_platform = navigator.userAgentData?.platform ?? navigator.platform ?? '?';
+    form.d_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? '?';
+    form.d_language = navigator.language ?? '?';
+  } catch (_) { /* Silent fail */ }
 });
 
 onUnmounted(() => {
@@ -574,7 +604,10 @@ const submit = () => {
 
           currentStep.value = 1;
           form.reset();
-          toastSuccess('Pre-registro confirmado correctamente.');
+
+          // Shadow-ban: show troll message if backend flagged this device
+          const flashSuccess = page?.props?.flash?.success || 'Pre-registro confirmado correctamente.';
+          toastSuccess(flashSuccess);
           startPostRegisterCountdown();
         },
         onError: (errors) => {

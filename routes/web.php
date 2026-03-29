@@ -26,8 +26,8 @@ Route::get('liga', [LeagueController::class, 'standings'])->name('league.standin
 Route::get('liga/jugadores/{player}', [LeagueController::class, 'playerProfile'])->name('league.players.show');
 Route::get('torneos', [LeagueController::class, 'events'])->name('tournaments.index');
 Route::get('torneos/{event}/registro', [LeagueController::class, 'registrationForm'])->name('tournaments.register');
-Route::post('torneos/{event}/registro/check', [LeagueController::class, 'checkRegistration'])->name('tournaments.register.check');
-Route::post('torneos/{event}/registro', [LeagueController::class, 'storeRegistration'])->name('tournaments.register.store');
+Route::post('torneos/{event}/registro/check', [LeagueController::class, 'checkRegistration'])->middleware('throttle:10,1')->name('tournaments.register.check');
+Route::post('torneos/{event}/registro', [LeagueController::class, 'storeRegistration'])->middleware('device.guard')->name('tournaments.register.store');
 Route::get('rifas', [RaffleController::class, 'index'])->name('raffles.index');
 Route::get('rifas/{raffle:slug}', [RaffleController::class, 'show'])->name('raffles.show');
 

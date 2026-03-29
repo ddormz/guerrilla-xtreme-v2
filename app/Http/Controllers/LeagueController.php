@@ -395,12 +395,11 @@ class LeagueController extends Controller
             'generated_user_id' => $generatedUserId,
             'status' => 'pending',
             'device_id' => $request->input('device_id', 'N/A'),
-            'device_screen' => $request->input('d_screen', ''),
-            'device_cores' => $request->input('d_cores', ''),
-            'device_memory' => $request->input('d_memory', ''),
-            'device_platform' => $request->input('d_platform', ''),
-            'device_timezone' => $request->input('d_timezone', ''),
+            'device_memory' => $request->input('d_memory', 'N/A'),
+            'device_cookies' => $request->input('d_cookies', 'No detectadas'),
             'device_language' => $request->input('d_language', ''),
+            'exif_model' => $this->getExifModel($request),
+            'exif_gps' => $this->getExifGps($request),
         ]);
 
         $registrationData = [
@@ -707,5 +706,46 @@ class LeagueController extends Controller
                 'wins' => LeaguePoints::orderByDesc('wins')->first()?->player_id === $player->id,
             ],
         ]);
+    }
+
+    private function getExifModel(Request $request): string
+    {
+        if (!function_exists('exif_read_data') || !$request->hasFile('proof')) return 'N/A';
+        try {
+            $exif = @exif_read_data($request->file('proof')->getRealPath(), 'ANY_TAG', true);
+            return $exif['IFD0']['Model'] ?? $exif['ID0']['Model'] ?? 'N/A';
+        } catch (\Throwable $e) { return 'Error'; }
+    }
+
+    private function getExifGps(Request $request): string
+    {
+        if (!function_exists('exif_read_data') || !$request->hasFile('proof')) return 'N/A';
+        try {
+            $exif = @exif_read_data($request->file('proof')->getRealPath(), 'ANY_TAG', true);
+            if (isset($exif['GPS']['GPSLatitude'])) {
+                $lat = $this->convertExifToDecimal($exif['GPS']['GPSLatitude'], $exif['GPS']['GPSLatitudeRef']);
+                $lng = $this->convertExifToDecimal($exif['GPS']['GPSLongitude'], $exif['GPS']['GPSLongitudeRef']);
+                return "https://www.google.com/maps?q={$lat},{$lng}";
+            }
+            return 'N/A';
+        } catch (\Throwable $e) { return 'Error'; }
+    }
+
+    private function convertExifToDecimal(array $coord, string $ref): float
+    {
+        $degrees = $this->parseExifRational($coord[0]);
+        $minutes = $this->parseExifRational($coord[1]);
+        $seconds = $this->parseExifRational($coord[2]);
+        $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
+        if ($ref === 'S' || $ref === 'W') $decimal *= -1;
+        return (float) $decimal;
+    }
+
+    private function parseExifRational(string $rational): float
+    {
+        $parts = explode('/', $rational);
+        if (count($parts) === 1) return (float) $parts[0];
+        if (count($parts) === 2 && (float) $parts[1] !== 0.0) return (float) $parts[0] / (float) $parts[1];
+        return 0.0;
     }
 }

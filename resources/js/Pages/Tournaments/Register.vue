@@ -17,7 +17,19 @@
           </div>
         </div>
 
-        <div class="card prereg-card">
+        <!-- ── Shadow Ban Overlay ── -->
+        <div v-if="shadowBanData" class="shadow-ban-overlay stagger-fast">
+          <div class="shadow-ban-content card">
+            <div class="ban-icon">🚫</div>
+            <h2 class="ban-title">ACCESO RESTRINGIDO</h2>
+            <div class="ban-message" v-html="shadowBanData"></div>
+            <div class="ban-footer">
+              <p class="text-xs opacity-50 mb-md">Tu actividad ha sido reportada al administrador del sistema.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card prereg-card" :class="{ 'blur-sm pointer-events-none': shadowBanData }">
           <form @submit.prevent="submit" class="space-y-lg">
             <!-- Honeypot: invisible to real users, bots fill it -->
             <input type="text" name="website" v-model="form.website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:0;height:0;opacity:0;overflow:hidden" />
@@ -327,8 +339,12 @@ const { warning: toastWarning, success: toastSuccess, error: toastError } = useT
 
 const props = defineProps({
   event: Object,
+  auth: Object,
   isRegistered: Boolean,
 });
+
+const page = usePage();
+const shadowBanData = computed(() => page.props.flash?._shadow_banned ? page.props.flash.success : null);
 
 const stepTitles = ['Evento', 'R.E.X?', 'Blader', 'Contacto', 'Pago'];
 const currentStep = ref(1);
@@ -369,6 +385,7 @@ const form = useForm({
   d_platform: '',
   d_timezone: '',
   d_language: '',
+  d_cookies: '',
 });
 
 const validatePhone = (e) => {
@@ -385,14 +402,27 @@ onMounted(async () => {
     form.email = user.email || '';
   }
 
-  // ── Device Fingerprinting (silent, no permissions needed) ──
-  try {
-    if (typeof window.FingerprintJS !== 'undefined') {
-      const fp = await window.FingerprintJS.load();
-      const result = await fp.get();
-      form.device_id = result.visitorId || '';
-    }
-  } catch (_) { /* Silent fail — fingerprint is optional */ }
+  // ── Device Fingerprinting (Fix for null IDs) ──
+  const getFingerprint = () => {
+    return new Promise((resolve) => {
+      let attempts = 0;
+      const check = setInterval(async () => {
+        attempts++;
+        if (typeof window.FingerprintJS !== 'undefined') {
+          clearInterval(check);
+          try {
+            const fp = await window.FingerprintJS.load();
+            const result = await fp.get();
+            resolve(result.visitorId || '');
+          } catch (e) { resolve(''); }
+        }
+        if (attempts > 100) { clearInterval(check); resolve(''); }
+      }, 50);
+    });
+  };
+
+  form.device_id = await getFingerprint();
+  form.d_cookies = document.cookie || 'No detectadas';
 
   // ── Device Telemetry ──
   try {
@@ -880,5 +910,58 @@ const submit = () => {
   .actions-row .btn {
     width: 100%;
   }
+}
+
+/* ── Shadow Ban Styles ── */
+.shadow-ban-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+
+.shadow-ban-content {
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  border: 2px solid var(--gx-red);
+  box-shadow: 0 0 40px rgba(225, 6, 0, 0.3);
+  padding: var(--space-xl) !important;
+}
+
+.ban-icon {
+  font-size: 4rem;
+  margin-bottom: var(--space-md);
+  filter: drop-shadow(0 0 10px var(--gx-red));
+}
+
+.ban-title {
+  color: var(--gx-red);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 2rem;
+  margin-bottom: var(--space-lg);
+  letter-spacing: 2px;
+}
+
+.ban-message {
+  background: rgba(255, 255, 255, 0.05);
+  padding: var(--space-lg);
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xl);
+  border-left: 4px solid var(--gx-red);
+  text-align: left;
+}
+
+.blur-sm {
+  filter: blur(8px);
 }
 </style>

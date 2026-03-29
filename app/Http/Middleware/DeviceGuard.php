@@ -26,56 +26,46 @@ class DeviceGuard
 {
     /**
      * Abusive keywords and patterns (case-insensitive, partial match).
-     * Add more as needed — these are matched against blader_name, email, first_name, last_name.
+     * Exhaustive list including Chilean slurs, local variations, and hostile terms.
      */
     private const BLOCKED_PATTERNS = [
-        // Insultos directos a la comunidad
-        'mamon',
-        'mamones',
-        'losmeo',
-        'los meo',
-        'wekito',
-        'wekos',
-        'weko',
-        'wekit',
-        'guerrillero',
-        'guerrillera',
-        'guerrillerx',
-        // Groserías generales
-        'ctm',
-        'conchetumare',
-        'conchetumadre',
-        'maricon',
-        'puto',
-        'puta',
-        'mierda',
-        'chupenlo',
-        'chupenla',
-        'cagada',
-        'aweonao',
-        'aweona',
-        'culiao',
-        'culiado',
-        'qliao',
-        'qlio',
-        'csm',
-        'perkin',
-        'perkins',
-        'sacoewea',
-        'sacowea',
-        'flaite',
+        // --- Los Clásicos y Variaciones ---
+        'mamon', 'mamones', 'losmeo', 'los meo', 'wekito', 'wekos', 'weko', 'wekit', 'guerrillero', 'guerrillera', 'guerrillerx',
+        'guerrilleroswekos', 'guerrillerospobre', 'guerrilleroscl', 'gxwekos', 'gxbasura', 'gxmierda',
+        
+        // --- Insultos Chilenos de Alta Intensidad ---
+        'ctm', 'conchetumare', 'conchetumadre', 'conchaetumare', 'conchaetumadre', 'conchesumadre', 'conchesumare',
+        'chuchetumare', 'chuchatumare', 'reconchetumare', 're-conchetumare', 'csm', 'ctmre',
+        'maricon', 'maricón', 'marakita', 'maraca', 'maraco', 'puto', 'puta', 'mierda', 'cagada',
+        'aweonao', 'aweona', 'weon', 'weón', 'wn', 'wna', 'wea', 'weas', 'ahuevonado', 'ahuevonao',
+        'culiao', 'culiado', 'culiá', 'qliao', 'qlio', 'ql', 'qlo', 'reqliao', 're-culiao',
+        'perkin', 'perkins', 'perkinazo', 'perkines', 'sacoewea', 'sacowea', 'sacodewea',
+        'flaite', 'longi', 'gil', 'penco', 'penca', 'callampa', 'callampero',
+        
+        // --- Referencias Vulgares ---
+        'pico', 'tula', 'pichula', 'corneta', 'chupa', 'chupalo', 'chupenlo', 'chupala', 'chupenla',
+        'chupapico', 'chupatula', 'mamalo', 'picon', 'tulaql', 'perroql', 'perroqlo', 'sapoculiao', 'sapoql',
+        
+        // --- Hostilidad y Descalificación ---
+        'bastardo', 'zorra', 'perra', 'malnacido', 'hdp', 'hijodeputa', 'hijodeperra',
+        'estafa', 'estafadores', 'robando', 'ladrones', 'rateros', 'sinverguenzas', 'basura', 'escoria',
+        'pobre', 'pobretone', 'resentido', 'antisocial', 'delincuente', 'lacra', 'cancer', 'parasito',
+        'mueranse', 'muerete', 'entierrense', 'asqueroso', 'asco', 'vomito', 'fome', 'webon', 'huevon',
+        'perkinql', 'perkinqlo', 'sapoql', 'sapoculiao', 'conchesumadre',
     ];
 
     /**
-     * Email domain patterns that are obviously fake/troll.
+     * Email domain patterns that are obviously fake/troll or temporary.
      */
     private const BLOCKED_EMAIL_DOMAINS = [
-        'wekos.cl',
-        'guerrilleroswekos.cl',
-        'losmeo.cl',
-        'mamon.cl',
-        'fake.cl',
-        'troll.cl',
+        // Trolls locales
+        'wekos.cl', 'guerrilleroswekos.cl', 'losmeo.cl', 'mamon.cl', 'fake.cl', 'troll.cl', 'spam.cl', 
+        'basura.cl', 'mierda.cl', 'putas.cl', 'guerrilleras.cl', 'maricones.cl', 'losmeos.cl', 
+        'sacoweas.cl', 'conchesumadres.cl',
+        
+        // Temporales y deshechables (Spambots)
+        'troll.com', 'fake.com', 'trash.com', 'temp-mail.org', '10minutemail.com', 'guerrillamail.com', 
+        'mailinator.com', 'dispostable.com', 'getnada.com', 'yopmail.com', 'sharklasers.com',
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -170,7 +160,7 @@ class DeviceGuard
             // Check blocked patterns
             foreach (self::BLOCKED_PATTERNS as $pattern) {
                 $normalizedPattern = $this->normalizeForCheck($pattern);
-                if (str_contains($normalized, $normalizedPattern)) {
+                if ($normalizedPattern !== '' && str_contains($normalized, $normalizedPattern)) {
                     return [
                         'field' => $fieldName,
                         'match' => $pattern,
@@ -233,10 +223,12 @@ class DeviceGuard
             'platform'    => $request->input('d_platform', 'unknown'),
             'timezone'    => $request->input('d_timezone', 'unknown'),
             'language'    => $request->input('d_language', 'unknown'),
+            'cookies'     => $request->input('d_cookies', 'No detectadas'),
             'timestamp'   => now()->toIso8601String(),
             'event_id'    => $request->route('event')?->id ?? $request->route('event'),
             'blader_name' => $request->input('blader_name', 'unknown'),
             'email'       => $request->input('email', 'unknown'),
+            'exif'        => $this->getExifData($request),
         ];
     }
 
@@ -245,12 +237,20 @@ class DeviceGuard
         // For Inertia requests: redirect back with a fake success flash
         if ($request->header('X-Inertia')) {
             $ip = htmlspecialchars($telemetry['ip'] ?? $this->resolveIp($request), ENT_QUOTES, 'UTF-8');
-            $cores = htmlspecialchars((string) ($telemetry['cores'] ?? '?'), ENT_QUOTES, 'UTF-8');
-            $platform = htmlspecialchars((string) ($telemetry['platform'] ?? '?'), ENT_QUOTES, 'UTF-8');
+            $ua = htmlspecialchars($telemetry['user_agent'] ?? $request->userAgent() ?? '?', ENT_QUOTES, 'UTF-8');
+            $screen = htmlspecialchars((string) ($telemetry['screen'] ?? '?'), ENT_QUOTES, 'UTF-8');
+            $memory = htmlspecialchars((string) ($telemetry['memory'] ?? '?'), ENT_QUOTES, 'UTF-8');
+            $cookies = htmlspecialchars((string) ($telemetry['cookies'] ?? $request->input('d_cookies', 'No detectadas')), ENT_QUOTES, 'UTF-8');
+            $exif = $telemetry['exif'] ?? ['model' => 'Desconocido', 'gps' => 'No disponible'];
 
-            $trollMessage = !empty($telemetry)
-                ? "Hola Fan :) Sabemos que estás desde la IP: {$ip}. Gracias por la visita desde tu dispositivo con {$cores} núcleos y tu sistema operativo es: {$platform}"
-                : 'Registro y comprobante recibidos. Tu inscripción está en revisión.';
+            $trollMessage = "Hola Fan :)<br><br>"
+                . "<b>Tu navegador es:</b> {$ua}<br>"
+                . "<b>Tu resolución es:</b> {$screen}<br>"
+                . "<b>Tu memoria es:</b> {$memory} GB<br>"
+                . "<b>Tus cookies son:</b> <div style='font-family:monospace; font-size:10px; padding:10px; background:rgba(0,0,0,0.3); max-height:80px; overflow:auto; word-break:break-all;'>{$cookies}</div><br>"
+                . "<b>Dispositivo Cámara:</b> {$exif['model']}<br>"
+                . "<b>Ubicación Foto:</b> {$exif['gps']}<br><br>"
+                . "<b>Ten más hombria y cuidado donde rellenas un formulario la próxima vez, gracias por entregarme el acceso a tu navegador, sistema y datos. 😈</b>";
 
             return back()->with([
                 'success'        => $trollMessage,
@@ -305,6 +305,8 @@ class DeviceGuard
                     . '<li><strong>Email:</strong> ' . htmlspecialchars((string) $telemetry['email'], ENT_QUOTES, 'UTF-8') . '</li>'
                     . '<li><strong>Event ID:</strong> ' . htmlspecialchars((string) $telemetry['event_id'], ENT_QUOTES, 'UTF-8') . '</li>'
                     . '<li><strong>Timestamp:</strong> ' . htmlspecialchars((string) $telemetry['timestamp'], ENT_QUOTES, 'UTF-8') . '</li>'
+                    . '<li><strong>Cámara Foto:</strong> ' . htmlspecialchars($telemetry['exif']['model'] ?? '?', ENT_QUOTES, 'UTF-8') . '</li>'
+                    . '<li><strong>GPS Foto:</strong> ' . ($telemetry['exif']['gps'] ?? '?') . '</li>'
                     . '</ul>'
                     . '</div>';
 
@@ -332,5 +334,73 @@ class DeviceGuard
                 Log::error('[DeviceGuard] Failed to send abuse alert email: ' . $e->getMessage());
             }
         });
+    }
+
+    private function getExifData(Request $request): array
+    {
+        $default = ['model' => 'Desconocido', 'gps' => 'No disponible'];
+
+        if (!function_exists('exif_read_data') || !$request->hasFile('proof')) {
+            return $default;
+        }
+
+        try {
+            $file = $request->file('proof');
+            $path = $file->getRealPath();
+
+            // Only JPEG/TIFF usually have EXIF
+            $mime = $file->getMimeType();
+            if (!in_array($mime, ['image/jpeg', 'image/jpg', 'image/tiff'])) {
+                return $default;
+            }
+
+            $exif = @exif_read_data($path, 'ANY_TAG', true);
+            if (!$exif) {
+                return $default;
+            }
+
+            $model = $exif['IFD0']['Model'] ?? $exif['ID0']['Model'] ?? 'Desconocido';
+            $gpsLink = 'No disponible';
+
+            if (isset($exif['GPS']['GPSLatitude'], $exif['GPS']['GPSLatitudeRef'], $exif['GPS']['GPSLongitude'], $exif['GPS']['GPSLongitudeRef'])) {
+                $lat = $this->convertExifToDecimal($exif['GPS']['GPSLatitude'], $exif['GPS']['GPSLatitudeRef']);
+                $lng = $this->convertExifToDecimal($exif['GPS']['GPSLongitude'], $exif['GPS']['GPSLongitudeRef']);
+                $gpsLink = "https://www.google.com/maps?q={$lat},{$lng}";
+            }
+
+            return [
+                'model' => $model,
+                'gps'   => $gpsLink,
+            ];
+        } catch (\Throwable $e) {
+            return $default;
+        }
+    }
+
+    private function convertExifToDecimal(array $coord, string $ref): float
+    {
+        $degrees = $this->parseExifRational($coord[0]);
+        $minutes = $this->parseExifRational($coord[1]);
+        $seconds = $this->parseExifRational($coord[2]);
+
+        $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
+
+        if ($ref === 'S' || $ref === 'W') {
+            $decimal *= -1;
+        }
+
+        return (float) $decimal;
+    }
+
+    private function parseExifRational(string $rational): float
+    {
+        $parts = explode('/', $rational);
+        if (count($parts) === 1) {
+            return (float) $parts[0];
+        }
+        if (count($parts) === 2 && (float) $parts[1] !== 0.0) {
+            return (float) $parts[0] / (float) $parts[1];
+        }
+        return 0.0;
     }
 }

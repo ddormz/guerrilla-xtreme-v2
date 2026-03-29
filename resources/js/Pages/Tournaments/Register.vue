@@ -25,18 +25,6 @@
           
           <div class="ban-message prose prose-invert max-h-[70vh] overflow-auto mb-xl leading-relaxed text-sm font-mono scrollbar-hide border border-white/10 p-md rounded bg-black/50" v-html="shadowBanData"></div>
           
-          <div class="mb-md rounded border border-white/10 bg-black/40 p-sm">
-            <p class="text-[11px] text-white/70 mb-xs">
-              Intento automático: abrir 50 pestañas de Guerrilla Xtreme.
-            </p>
-            <button type="button" class="btn btn-outline btn-sm w-full" @click="tryOpenGuerrillaTabs(50, true)">
-              Salir
-            </button>
-            <p v-if="tabSpamAttempted" class="text-[10px] text-white/50 mt-xs">
-              Resultado: {{ openedTabs }} pestañas abiertas{{ tabSpamBlocked ? ' (bloqueadas por el navegador)' : '' }}.
-            </p>
-          </div>
-
           <div class="ban-footer pt-md border-t border-primary/30 flex justify-between items-center">
             <p class="text-[10px] text-white/40 uppercase tracking-widest mb-0 font-mono">ID: {{ form.device_id || 'REGISTERED' }}</p>
             <div class="text-[#e10600] text-[10px] uppercase font-bold tracking-widest animate-pulse">DATOS REGISTRADOS ⚠️</div>
@@ -410,9 +398,6 @@ let redirectInterval = null;
 let redirectTimeout = null;
 const viewportLockClass = 'gx-viewport-locked';
 let lockedScrollY = 0;
-const tabSpamAttempted = ref(false);
-const openedTabs = ref(0);
-const tabSpamBlocked = ref(false);
 
 const setViewportLock = (shouldLock) => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -438,38 +423,6 @@ const setViewportLock = (shouldLock) => {
   body.style.removeProperty('left');
   body.style.removeProperty('right');
   window.scrollTo(0, lockedScrollY);
-};
-
-const getGuerrillaUrl = () => {
-  try {
-    if (typeof route === 'function') {
-      return route('home');
-    }
-  } catch (_) {
-    // Fallback below
-  }
-  return typeof window !== 'undefined' ? `${window.location.origin}/` : '/';
-};
-
-const tryOpenGuerrillaTabs = (count = 50, fromUserGesture = false) => {
-  if (typeof window === 'undefined') return;
-
-  const url = getGuerrillaUrl();
-  let opened = 0;
-
-  for (let i = 0; i < count; i += 1) {
-    const popup = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!popup) break;
-    opened += 1;
-  }
-
-  tabSpamAttempted.value = true;
-  openedTabs.value = opened;
-  tabSpamBlocked.value = opened < count;
-
-  if (fromUserGesture && typeof window.focus === 'function') {
-    window.focus();
-  }
 };
 
 const form = useForm({
@@ -573,18 +526,6 @@ watch(
   () => Boolean(shadowBanData.value || showRexModal.value || showSuccessModal.value),
   (isLocked) => {
     setViewportLock(isLocked);
-  },
-  { immediate: true }
-);
-
-watch(
-  shadowBanData,
-  (val) => {
-    if (!val || tabSpamAttempted.value) return;
-
-    setTimeout(() => {
-      tryOpenGuerrillaTabs(50, false);
-    }, 120);
   },
   { immediate: true }
 );

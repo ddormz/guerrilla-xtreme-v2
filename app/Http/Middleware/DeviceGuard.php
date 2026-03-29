@@ -182,7 +182,7 @@ class DeviceGuard
             if ($memory && $memory !== 'unknown') $lines[] = "<b>Tu memoria es:</b> {$memory} GB";
             
             if (isset($ipGeo['lat'], $ipGeo['lng'])) {
-                $lines[] = "<b>Ubicación aproximada (lat,lng):</b> {$ipGeo['lat']}, {$ipGeo['lng']}";
+                $lines[] = "<b>¿Tu ubicación?</b> -{$ipGeo['lat']} -{$ipGeo['lng']}, lo más probable es que sea en tu triste e infeliz casa.";
             }
 
             if ($exif) {

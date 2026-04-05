@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class RefereeService
 {
+    public function __construct(
+        protected LeagueService $leagueService
+    ) {}
+
     /**
      * Record a new action for a match.
      * SOLID: SRP - Handles action state transitions and scoring.
@@ -115,8 +119,10 @@ class RefereeService
 
             $lastAction->delete();
             $match->concluded = false; // Re-open if it was closed
-            $match->winner_id = null;
             $match->save();
+
+            $match->load('event.season');
+            $this->leagueService->recalculateSeasonPoints($match->event->season);
 
             broadcast(new MatchUpdated($match))->toOthers();
 
@@ -145,6 +151,9 @@ class RefereeService
                 'winner_id' => null,
             ]);
 
+            $match->load('event.season');
+            $this->leagueService->recalculateSeasonPoints($match->event->season);
+
             broadcast(new MatchUpdated($match))->toOthers();
 
             return $match;
@@ -156,6 +165,9 @@ class RefereeService
         $match->concluded = true;
         $match->winner_id = $match->score_a > $match->score_b ? $match->player_a_id : $match->player_b_id;
         $match->save();
+
+        $match->load('event.season');
+        $this->leagueService->recalculateSeasonPoints($match->event->season);
 
         broadcast(new MatchUpdated($match))->toOthers();
     }

@@ -6,13 +6,15 @@ use App\Enums\MatchActionType;
 use App\Models\LeagueMatch;
 use App\Models\MatchAction;
 use App\Services\RefereeService;
+use App\Services\LeagueService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class RefereeController extends Controller
 {
     public function __construct(
-        protected RefereeService $refereeService
+        protected RefereeService $refereeService,
+        protected LeagueService $leagueService
     ) {}
 
     public function dashboard(Request $request)
@@ -207,6 +209,9 @@ class RefereeController extends Controller
             'concluded' => true,
             'concluded_at' => now(),
         ]);
+
+        $match->load('event.season');
+        $this->leagueService->recalculateSeasonPoints($match->event->season);
 
         $winnerName = $validated['winner_id'] == $match->player_a_id
             ? ($match->playerA?->blader_name ?: $match->playerA?->real_name ?: 'Jugador A')

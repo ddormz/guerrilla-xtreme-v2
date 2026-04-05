@@ -22,6 +22,14 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+Route::get('/dev/recalc', function () {
+    foreach(\App\Models\LeagueSeason::all() as $season) {
+        app(\App\Services\LeagueService::class)->recalculateSeasonPoints($season);
+    }
+    return "All seasons recalculated successfully.";
+});
+
 Route::get('liga', [LeagueController::class, 'standings'])->name('league.standings');
 Route::get('liga/jugadores/{player}', [LeagueController::class, 'playerProfile'])->name('league.players.show');
 Route::get('torneos', [LeagueController::class, 'events'])->name('tournaments.index');

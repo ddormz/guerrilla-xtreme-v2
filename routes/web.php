@@ -24,10 +24,23 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
 Route::get('/dev/recalc', function () {
+    $results = [];
     foreach(\App\Models\LeagueSeason::all() as $season) {
         app(\App\Services\LeagueService::class)->recalculateSeasonPoints($season);
+        $standings = \App\Models\LeaguePoints::where('season_id', $season->id)
+            ->with('player')
+            ->orderByDesc('points')
+            ->orderByDesc('xtremes')
+            ->get();
+        $results[$season->name] = $standings->map(fn($s) => [
+            'player' => $s->player->display_name ?? $s->player_id,
+            'points' => $s->points,
+            'wins' => $s->wins,
+            'losses' => $s->losses,
+            'xtremes' => $s->xtremes,
+        ]);
     }
-    return "All seasons recalculated successfully.";
+    return response()->json(['status' => 'OK', 'standings' => $results], 200, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 });
 
 Route::get('liga', [LeagueController::class, 'standings'])->name('league.standings');

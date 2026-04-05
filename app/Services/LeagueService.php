@@ -50,27 +50,32 @@ class LeagueService
 
     /**
      * Apply a single match result to the standings.
+     * GX Rule: Points = the actual score earned in each match.
+     * If a player scores 6 in a match, they get 6 points added to standings.
+     * Tiebreaker: xtremes count, then wins.
      */
     private function applyMatchResult(int $seasonId, LeagueMatch $match): void
     {
         if (!$match->player_a_id || !$match->player_b_id) return;
 
-        // Player A
+        // Player A gets their actual match score as league points
         $this->updatePlayerStats($seasonId, $match->player_a_id, [
-            'win' => $match->winner_id === $match->player_a_id,
-            'xtremes' => $match->xtreme_a,
-            'spins' => $match->spin_a,
-            'overs' => $match->over_a,
-            'bursts' => $match->burst_a,
+            'score' => (int) $match->score_a,
+            'win' => $match->winner_id == $match->player_a_id,
+            'xtremes' => (int) $match->xtreme_a,
+            'spins' => (int) $match->spin_a,
+            'overs' => (int) $match->over_a,
+            'bursts' => (int) $match->burst_a,
         ]);
 
-        // Player B
+        // Player B gets their actual match score as league points
         $this->updatePlayerStats($seasonId, $match->player_b_id, [
-            'win' => $match->winner_id === $match->player_b_id,
-            'xtremes' => $match->xtreme_b,
-            'spins' => $match->spin_b,
-            'overs' => $match->over_b,
-            'bursts' => $match->burst_b,
+            'score' => (int) $match->score_b,
+            'win' => $match->winner_id == $match->player_b_id,
+            'xtremes' => (int) $match->xtreme_b,
+            'spins' => (int) $match->spin_b,
+            'overs' => (int) $match->over_b,
+            'bursts' => (int) $match->burst_b,
         ]);
     }
 
@@ -80,19 +85,13 @@ class LeagueService
             ['season_id' => $seasonId, 'player_id' => $playerId]
         );
 
+        // Points = direct sum of match scores (Spin=1, Over=2, Burst=2, Xtreme=3)
+        $pointsRecord->increment('points', $stats['score']);
         $pointsRecord->increment('wins', $stats['win'] ? 1 : 0);
         $pointsRecord->increment('losses', $stats['win'] ? 0 : 1);
         $pointsRecord->increment('xtremes', $stats['xtremes']);
         $pointsRecord->increment('spins', $stats['spins']);
         $pointsRecord->increment('overs', $stats['overs']);
         $pointsRecord->increment('bursts', $stats['bursts']);
-
-        // Calculate total points based on GX rules
-        // (This logic can be injected via a Strategy pattern if rules change)
-        $totalPoints = ($pointsRecord->wins * 3) + // 3 points per win
-                       ($pointsRecord->xtremes * 1) + // Bonus for xtremes? Adjust as per user preference
-                       ($pointsRecord->bursts * 1);
-
-        $pointsRecord->update(['points' => $totalPoints]);
     }
 }

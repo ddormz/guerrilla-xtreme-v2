@@ -38,7 +38,7 @@ class LeagueService
             ]);
 
             // Get all concluded matches
-            $matches = LeagueMatch::where('event_id', function($query) use ($season) {
+            $matches = LeagueMatch::whereIn('event_id', function($query) use ($season) {
                 $query->select('id')->from('league_events')->where('season_id', $season->id);
             })->where('concluded', true)->get();
 

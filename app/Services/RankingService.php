@@ -28,10 +28,9 @@ class RankingService
                 'matches_played' => 0,
             ]);
 
-            // Get all concluded matches from Torneo+Ranking events, from June 2026 onwards
+            // Get all concluded matches from Torneo+Ranking events
             $matches = LeagueMatch::whereHas('event', function ($query) {
-                $query->where('event_type', EventType::TorneoRanking->value)
-                    ->where('event_date', '>=', '2026-06-01 00:00:00');
+                $query->where('event_type', EventType::TorneoRanking->value);
             })->where('concluded', true)->get();
 
             foreach ($matches as $match) {
@@ -90,16 +89,45 @@ class RankingService
         ]);
     }
 
-    /**
-     * Get the global ranking standings.
-     */
     public function getStandings()
     {
-        return RankingPoints::with('player')
-            ->where('matches_played', '>', 0)
-            ->orderByDesc('differential')
-            ->orderByDesc('xtremes')
-            ->orderByDesc('wins')
-            ->get();
+        $members = \App\Models\User::where('role', \App\Enums\UserRole::MiembroGx)->get()->keyBy('id');
+        $points = RankingPoints::with('player')->get()->keyBy('player_id');
+
+        // Merge users who have points but are not MiembroGx (e.g. admins who played)
+        foreach ($points as $playerId => $point) {
+            if (!$members->has($playerId) && $point->player) {
+                $members->put($playerId, $point->player);
+            }
+        }
+
+        $standings = $members->map(function ($user) use ($points) {
+            if ($points->has($user->id)) {
+                return $points->get($user->id);
+            }
+
+            $p = new RankingPoints([
+                'points_for' => 0,
+                'points_against' => 0,
+                'differential' => 0,
+                'wins' => 0,
+                'losses' => 0,
+                'xtremes' => 0,
+                'matches_played' => 0,
+            ]);
+            $p->player_id = $user->id;
+            $p->setRelation('player', $user);
+            return $p;
+        });
+
+        return $standings->sort(function ($a, $b) {
+            if ($a->differential !== $b->differential) {
+                return $b->differential <=> $a->differential;
+            }
+            if ($a->xtremes !== $b->xtremes) {
+                return $b->xtremes <=> $a->xtremes;
+            }
+            return $b->wins <=> $a->wins;
+        })->values();
     }
 }

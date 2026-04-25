@@ -87,7 +87,6 @@
         <div v-if="standings.length === 0" class="p-2xl text-center text-muted empty-state">
           <div class="empty-icon">🏅</div>
           <p class="mt-md">Aún no hay datos de ranking.</p>
-          <p class="text-sm text-secondary">El Ranking Global comenzará a registrar resultados desde Junio 2026 con los eventos <strong>Torneo + Ranking</strong>.</p>
         </div>
       </div>
     </div>

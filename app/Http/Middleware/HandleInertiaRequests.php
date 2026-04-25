@@ -37,6 +37,7 @@ class HandleInertiaRequests extends Middleware
                     'avatar_url' => $request->user()->avatar_url,
                 ] : null,
             ],
+            'site_settings' => fn () => app(\App\Services\SettingsService::class)->getSettings(),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

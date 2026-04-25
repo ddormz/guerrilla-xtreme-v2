@@ -16,7 +16,7 @@
           <Link :href="route('home')" class="nav-link" :class="{ active: $page.component === 'Home' }">
             <span class="nav-icon">🏠</span> Inicio
           </Link>
-          <Link href="/rifas" class="nav-link" :class="{ active: $page.url.startsWith('/rifas') }">
+          <Link v-if="($page.props.site_settings?.modules?.rifas ?? true) || auth?.user?.role === 'admin'" href="/rifas" class="nav-link" :class="{ active: $page.url.startsWith('/rifas') }">
             <span class="nav-icon">🎟️</span> Rifas
           </Link>
           <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/liga" class="nav-link" :class="{ active: $page.url.startsWith('/liga') }">
@@ -25,7 +25,7 @@
           <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/ranking" class="nav-link" :class="{ active: $page.url.startsWith('/ranking') }">
             <span class="nav-icon">🏅</span> Ranking
           </Link>
-          <Link :href="route('tournaments.index')" class="nav-link" :class="{ active: $page.url.startsWith('/torneos') }">
+          <Link v-if="($page.props.site_settings?.modules?.torneos ?? true) || auth?.user?.role === 'admin'" :href="route('tournaments.index')" class="nav-link" :class="{ active: $page.url.startsWith('/torneos') }">
             <span class="nav-icon">⚔️</span> Torneos
           </Link>
           
@@ -121,9 +121,9 @@
       <BottomNavItem icon="🏠" label="Inicio" :href="route('home')" :active="$page.component === 'Home'" />
       <BottomNavItem v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" icon="🏆" label="Liga" href="/liga" :active="$page.url.startsWith('/liga')" />
       <BottomNavItem v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" icon="🏅" label="Ranking" href="/ranking" :active="$page.url.startsWith('/ranking')" />
-      <BottomNavItem icon="⚔️" label="Torneos" href="/torneos" :active="$page.url.startsWith('/torneos')" />
+      <BottomNavItem v-if="($page.props.site_settings?.modules?.torneos ?? true) || auth?.user?.role === 'admin'" icon="⚔️" label="Torneos" href="/torneos" :active="$page.url.startsWith('/torneos')" />
       <BottomNavItem v-if="auth?.user && ['admin', 'arbitro_gx'].includes(auth.user.role)" icon="⚖️" label="Arbitrar" :href="route('referee.dashboard')" :active="$page.url.startsWith('/arbitrio')" />
-      <BottomNavItem icon="🎟️" label="Rifas" href="/rifas" :active="$page.url.startsWith('/rifas')" />
+      <BottomNavItem v-if="($page.props.site_settings?.modules?.rifas ?? true) || auth?.user?.role === 'admin'" icon="🎟️" label="Rifas" href="/rifas" :active="$page.url.startsWith('/rifas')" />
       <BottomNavItem icon="☰" label="Menú" @click="mobileMenuOpen = !mobileMenuOpen" :active="mobileMenuOpen" is-button />
     </nav>
 

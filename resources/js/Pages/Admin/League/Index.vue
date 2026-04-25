@@ -20,7 +20,8 @@
         <section class="stagger">
           <h2 class="mb-lg">Temporadas</h2>
           <div class="card p-0 overflow-hidden">
-            <table class="gx-table">
+            <div class="table-container pb-sm">
+              <table class="gx-table">
               <thead>
                 <tr>
                   <th>Nombre</th>
@@ -35,14 +36,16 @@
                   <td class="text-right text-muted">{{ s.start_date }}</td>
                 </tr>
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </section>
 
         <section class="stagger">
           <h2 class="mb-lg">Últimos Eventos</h2>
           <div class="card p-0 overflow-hidden">
-            <table class="gx-table">
+            <div class="table-container pb-sm">
+              <table class="gx-table">
               <thead>
                 <tr>
                   <th>Evento</th>
@@ -70,10 +73,11 @@
                   </td>
                 </tr>
               </tbody>
-            </table>
-          </div>
-          <div class="mt-4 flex justify-center">
-            <PaginationLinks :links="events.links" />
+              </table>
+            </div>
+            <div class="mt-4 flex justify-center pb-md">
+              <PaginationLinks :links="events.links" />
+            </div>
           </div>
         </section>
 
@@ -87,7 +91,8 @@
               </span>
             </div>
 
-            <table v-if="pendingLeaguePayments.length" class="gx-table">
+            <div class="table-container pb-sm">
+              <table v-if="pendingLeaguePayments.length" class="gx-table">
               <thead>
                 <tr>
                   <th>Evento</th>
@@ -109,7 +114,8 @@
                 </tr>
               </tbody>
             </table>
-            <div v-else class="p-lg text-center text-secondary italic">
+            </div>
+            <div v-if="!pendingLeaguePayments.length" class="p-lg text-center text-secondary italic">
               No hay pagos pendientes de liga.
             </div>
           </div>

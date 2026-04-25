@@ -93,6 +93,13 @@
                 <p>Historial detallado de cambios y acciones administrativas.</p>
               </div>
             </Link>
+            <Link :href="route('admin.settings.index')" class="module-card card card-hover">
+              <div class="module-icon">⚙️</div>
+              <div class="module-content">
+                <h3>Configuración</h3>
+                <p>Habilitar y deshabilitar módulos públicos (Rifas, Torneos).</p>
+              </div>
+            </Link>
       </div>
     </div>
   </div>

@@ -12,20 +12,20 @@
         </Link>
 
         <!-- Center: Desktop Navigation -->
-        <nav class="navbar-nav desktop-only">
+        <nav class="navbar-nav desktop-only centered-nav">
           <Link :href="route('home')" class="nav-link" :class="{ active: $page.component === 'Home' }">
             <span class="nav-icon">🏠</span> Inicio
           </Link>
-          <Link v-if="modules?.rifas !== false" href="/rifas" class="nav-link" :class="{ active: $page.url.startsWith('/rifas') }">
+          <Link href="/rifas" class="nav-link" :class="{ active: $page.url.startsWith('/rifas') }">
             <span class="nav-icon">🎟️</span> Rifas
           </Link>
-          <Link v-if="modules?.liga !== false && (auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin')" href="/liga" class="nav-link" :class="{ active: $page.url.startsWith('/liga') }">
+          <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/liga" class="nav-link" :class="{ active: $page.url.startsWith('/liga') }">
             <span class="nav-icon">🏆</span> Liga
           </Link>
-          <Link v-if="modules?.ranking !== false && (auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin')" href="/ranking" class="nav-link" :class="{ active: $page.url.startsWith('/ranking') }">
+          <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/ranking" class="nav-link" :class="{ active: $page.url.startsWith('/ranking') }">
             <span class="nav-icon">🏅</span> Ranking
           </Link>
-          <Link v-if="modules?.torneos !== false" :href="route('tournaments.index')" class="nav-link" :class="{ active: $page.url.startsWith('/torneos') }">
+          <Link :href="route('tournaments.index')" class="nav-link" :class="{ active: $page.url.startsWith('/torneos') }">
             <span class="nav-icon">⚔️</span> Torneos
           </Link>
           
@@ -48,12 +48,9 @@
             <span v-else>🌙</span>
           </button>
 
-          <div v-if="auth?.user?.role === 'admin'" class="desktop-only admin-links">
-            <Link href="/admin/ligas" class="nav-link nav-link-sm" :class="{ active: $page.url.startsWith('/admin') && !$page.url.startsWith('/admin/configuracion') }">
+          <div v-if="auth?.user?.role === 'admin'" class="desktop-only text-sm">
+            <Link href="/admin" class="nav-link" :class="{ active: $page.url.startsWith('/admin') }">
               <span class="nav-icon">⚙️</span> Admin
-            </Link>
-            <Link href="/admin/configuracion" class="nav-link nav-link-sm" :class="{ active: $page.url.startsWith('/admin/configuracion') }">
-              <span class="nav-icon">🔧</span> Config
             </Link>
           </div>
 
@@ -86,10 +83,10 @@
       <Transition name="slide-down">
         <nav v-if="mobileMenuOpen" class="mobile-nav mobile-only">
           <Link :href="route('home')" class="mobile-nav-link" @click="mobileMenuOpen = false">🏠 Inicio</Link>
-          <Link v-if="modules?.rifas !== false" href="/rifas" class="mobile-nav-link" @click="mobileMenuOpen = false">🎟️ Rifas</Link>
-          <Link v-if="modules?.liga !== false && (auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin')" href="/liga" class="mobile-nav-link" @click="mobileMenuOpen = false">🏆 Liga</Link>
-          <Link v-if="modules?.ranking !== false && (auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin')" href="/ranking" class="mobile-nav-link" @click="mobileMenuOpen = false">🏅 Ranking</Link>
-          <Link v-if="modules?.torneos !== false" href="/torneos" class="mobile-nav-link" @click="mobileMenuOpen = false">⚔️ Torneos</Link>
+          <Link href="/rifas" class="mobile-nav-link" @click="mobileMenuOpen = false">🎟️ Rifas</Link>
+          <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/liga" class="mobile-nav-link" @click="mobileMenuOpen = false">🏆 Liga</Link>
+          <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/ranking" class="mobile-nav-link" @click="mobileMenuOpen = false">🏅 Ranking</Link>
+          <Link href="/torneos" class="mobile-nav-link" @click="mobileMenuOpen = false">⚔️ Torneos</Link>
           <button class="mobile-nav-link theme-switch-item" @click="toggleTheme">
             <span>{{ isDark ? '☀️ Modo Claro' : '🌙 Modo Oscuro' }}</span>
           </button>
@@ -106,8 +103,7 @@
           </template>
 
           <template v-if="auth?.user?.role === 'admin'">
-            <Link href="/admin/ligas" class="mobile-nav-link" @click="mobileMenuOpen = false">⚙️ Panel Admin</Link>
-            <Link href="/admin/configuracion" class="mobile-nav-link" @click="mobileMenuOpen = false">🔧 Configuración</Link>
+            <Link href="/admin" class="mobile-nav-link" @click="mobileMenuOpen = false">⚙️ Panel Admin</Link>
           </template>
         </nav>
       </Transition>
@@ -123,11 +119,11 @@
     <!-- Bottom Nav (Mobile Only) -->
     <nav class="bottom-nav mobile-only">
       <BottomNavItem icon="🏠" label="Inicio" :href="route('home')" :active="$page.component === 'Home'" />
-      <BottomNavItem v-if="modules?.liga !== false && (auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin')" icon="🏆" label="Liga" href="/liga" :active="$page.url.startsWith('/liga')" />
-      <BottomNavItem v-if="modules?.ranking !== false && (auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin')" icon="🏅" label="Ranking" href="/ranking" :active="$page.url.startsWith('/ranking')" />
-      <BottomNavItem v-if="modules?.torneos !== false" icon="⚔️" label="Torneos" href="/torneos" :active="$page.url.startsWith('/torneos')" />
+      <BottomNavItem v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" icon="🏆" label="Liga" href="/liga" :active="$page.url.startsWith('/liga')" />
+      <BottomNavItem v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" icon="🏅" label="Ranking" href="/ranking" :active="$page.url.startsWith('/ranking')" />
+      <BottomNavItem icon="⚔️" label="Torneos" href="/torneos" :active="$page.url.startsWith('/torneos')" />
       <BottomNavItem v-if="auth?.user && ['admin', 'arbitro_gx'].includes(auth.user.role)" icon="⚖️" label="Arbitrar" :href="route('referee.dashboard')" :active="$page.url.startsWith('/arbitrio')" />
-      <BottomNavItem v-if="modules?.rifas !== false" icon="🎟️" label="Rifas" href="/rifas" :active="$page.url.startsWith('/rifas')" />
+      <BottomNavItem icon="🎟️" label="Rifas" href="/rifas" :active="$page.url.startsWith('/rifas')" />
       <BottomNavItem icon="☰" label="Menú" @click="mobileMenuOpen = !mobileMenuOpen" :active="mobileMenuOpen" is-button />
     </nav>
 
@@ -148,7 +144,6 @@ const page = usePage();
 const { success, error } = useToast();
 const auth = computed(() => page.props.auth);
 const flash = computed(() => page.props.flash || {});
-const modules = computed(() => page.props.modules || {});
 
 // Watch for inertia flash messages and show toasts
 watch(() => page.props.flash, (newFlash) => {
@@ -242,41 +237,32 @@ onUnmounted(() => {
 .navbar-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  flex: 1;
-  justify-content: center;
-  min-width: 0;
+  gap: var(--space-lg);
 }
 
-.admin-links {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
+.centered-nav {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .nav-link {
   color: var(--text-secondary);
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 10px 6px;
+  letter-spacing: 0.05em;
+  padding: 10px 4px;
   transition: all var(--transition-fast);
   position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.nav-link-sm {
-  font-size: 0.75rem;
+  gap: 6px;
 }
 
 .nav-icon {
-  font-size: 0.95rem;
+  font-size: 1.1rem;
 }
 
 .nav-link:hover, .nav-link.active {

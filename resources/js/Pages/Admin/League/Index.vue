@@ -4,7 +4,7 @@
 
     <div class="admin-league page-content">
       <nav class="mb-lg">
-        <Link href="/admin/ligas" class="btn btn-ghost btn-sm">← Admin</Link>
+        <Link :href="route('admin.dashboard')" class="btn btn-ghost btn-sm">← Dashboard</Link>
       </nav>
 
       <div class="page-header mb-xl">
@@ -72,13 +72,8 @@
               </tbody>
             </table>
           </div>
-
-          <!-- Pagination -->
-          <div v-if="events.links && events.last_page > 1" class="pagination-wrapper">
-            <template v-for="link in events.links" :key="link.label">
-              <Link v-if="link.url" :href="link.url" class="btn btn-sm" :class="link.active ? 'btn-primary' : 'btn-ghost'" v-html="link.label" preserve-scroll />
-              <span v-else class="btn btn-sm btn-ghost disabled" v-html="link.label" />
-            </template>
+          <div class="mt-4 flex justify-center">
+            <PaginationLinks :links="events.links" />
           </div>
         </section>
 
@@ -343,6 +338,7 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { useConfirm } from '@/Composables/useConfirm';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ImageCropper from '@/Components/ImageCropper.vue';
+import PaginationLinks from '@/Components/PaginationLinks.vue';
 
 const props = defineProps({
   seasons: Array,
@@ -782,19 +778,5 @@ const submitPlayer = () => playerForm.post(route('admin.players.store'), { onSuc
   .roster-inline-form button {
     width: 100%;
   }
-}
-
-.pagination-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-xs);
-  padding: var(--space-md);
-  flex-wrap: wrap;
-}
-
-.pagination-wrapper .disabled {
-  opacity: 0.4;
-  pointer-events: none;
 }
 </style>

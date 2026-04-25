@@ -4,7 +4,7 @@
 
     <div class="admin-raffles page-content">
       <nav class="mb-lg">
-        <Link href="/admin/ligas" class="btn btn-ghost btn-sm">← Admin</Link>
+        <Link :href="route('admin.dashboard')" class="btn btn-ghost btn-sm">← Dashboard</Link>
       </nav>
 
       <div class="page-header mb-xl">

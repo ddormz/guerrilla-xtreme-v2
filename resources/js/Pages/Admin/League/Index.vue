@@ -201,9 +201,9 @@
               <div class="form-group">
                 <label class="form-label">Tipo</label>
                 <select v-model="eventForm.event_type" class="form-input" required>
-                  <option value="liga">Liga (Ranking Liga)</option>
+                  <option value="liga">Liga</option>
                   <option value="torneo">Torneo (Eliminación)</option>
-                  <option value="torneo_ranking">Torneo + Ranking (Global)</option>
+                  <option value="torneo_ranking">Torneo + Ranking</option>
                 </select>
               </div>
             </div>

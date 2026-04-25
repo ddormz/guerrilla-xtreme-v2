@@ -91,19 +91,23 @@ class RankingService
 
     public function getStandings()
     {
-        $members = \App\Models\User::where('role', \App\Enums\UserRole::MiembroGx)->get()->keyBy('id');
+        // Fetch all LeaguePlayers who belong to MiembroGx or Admin
+        $players = \App\Models\LeaguePlayer::whereHas('user', function($q) {
+            $q->where('role', \App\Enums\UserRole::MiembroGx);
+        })->get()->keyBy('id');
+
         $points = RankingPoints::with('player')->get()->keyBy('player_id');
 
-        // Merge users who have points but are not MiembroGx (e.g. admins who played)
+        // Merge players who have points but are not in the query
         foreach ($points as $playerId => $point) {
-            if (!$members->has($playerId) && $point->player) {
-                $members->put($playerId, $point->player);
+            if (!$players->has($playerId) && $point->player) {
+                $players->put($playerId, $point->player);
             }
         }
 
-        $standings = $members->map(function ($user) use ($points) {
-            if ($points->has($user->id)) {
-                return $points->get($user->id);
+        $standings = $players->map(function ($player) use ($points) {
+            if ($points->has($player->id)) {
+                return $points->get($player->id);
             }
 
             $p = new RankingPoints([
@@ -115,12 +119,19 @@ class RankingService
                 'xtremes' => 0,
                 'matches_played' => 0,
             ]);
-            $p->player_id = $user->id;
-            $p->setRelation('player', $user);
+            $p->player_id = $player->id;
+            $p->setRelation('player', $player);
             return $p;
         });
 
         return $standings->sort(function ($a, $b) {
+            $aPlayed = $a->matches_played > 0 ? 1 : 0;
+            $bPlayed = $b->matches_played > 0 ? 1 : 0;
+            
+            if ($aPlayed !== $bPlayed) {
+                return $bPlayed <=> $aPlayed;
+            }
+
             if ($a->differential !== $b->differential) {
                 return $b->differential <=> $a->differential;
             }

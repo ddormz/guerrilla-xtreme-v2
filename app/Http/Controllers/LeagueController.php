@@ -27,8 +27,40 @@ use Inertia\Response;
 class LeagueController extends Controller
 {
     public function __construct(
-        protected LeagueService $leagueService
+        protected LeagueService $leagueService,
+        protected \App\Services\RankingService $rankingService,
     ) {}
+
+    /**
+     * Global Ranking - Differential points system.
+     * Visible to miembro_gx and admin only.
+     */
+    public function ranking(): Response
+    {
+        if (!auth()->check() || !in_array(auth()->user()->role, [UserRole::MiembroGx, UserRole::Admin], true)) {
+            return Inertia::render('Home', [
+                'flash' => ['error' => 'Solo los Miembros GX pueden ver el Ranking Global.']
+            ]);
+        }
+
+        $standings = $this->rankingService->getStandings()->map(fn ($p) => [
+            'id' => $p->id,
+            'player_id' => $p->player_id,
+            'player_name' => $p->player->display_name,
+            'avatar_url' => $p->player->avatar_url,
+            'wins' => $p->wins,
+            'losses' => $p->losses,
+            'points_for' => $p->points_for,
+            'points_against' => $p->points_against,
+            'differential' => $p->differential,
+            'xtremes' => $p->xtremes,
+            'matches_played' => $p->matches_played,
+        ]);
+
+        return Inertia::render('League/Ranking', [
+            'standings' => $standings,
+        ]);
+    }
 
     public function standings(?LeagueSeason $season = null): Response
     {

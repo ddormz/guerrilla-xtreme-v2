@@ -58,7 +58,7 @@
                     <span v-if="e.season?.name" class="text-xs text-muted block">{{ e.season.name }}</span>
                   </td>
                   <td class="text-center">
-                    <span class="badge" :class="e.event_type === 'torneo' ? 'badge-amber' : 'badge-blue'">{{ e.event_type }}</span>
+                    <span class="badge" :class="eventBadgeClass(e.event_type)">{{ eventTypeLabel(e.event_type) }}</span>
                   </td>
                   <td class="text-right text-sm">{{ formatDateTime(e.event_date) }}</td>
                   <td class="text-right">
@@ -201,8 +201,9 @@
               <div class="form-group">
                 <label class="form-label">Tipo</label>
                 <select v-model="eventForm.event_type" class="form-input" required>
-                  <option value="liga">Liga (Ranking)</option>
+                  <option value="liga">Liga (Ranking Liga)</option>
                   <option value="torneo">Torneo (Eliminación)</option>
+                  <option value="torneo_ranking">Torneo + Ranking (Global)</option>
                 </select>
               </div>
             </div>
@@ -557,7 +558,7 @@ const resetTournamentOnlyFields = () => {
 };
 
 watch(() => eventForm.event_type, (type) => {
-  if (type === 'liga') {
+  if (type === 'liga' || type === 'torneo_ranking') {
     resetTournamentOnlyFields();
   }
 });
@@ -575,6 +576,18 @@ const submitEvent = () => {
     eventForm.post(route('admin.events.store'), { onSuccess: () => (activeModal.value = null) });
   }
 };
+const eventBadgeClass = (type) => {
+  if (type === 'torneo') return 'badge-amber';
+  if (type === 'torneo_ranking') return 'badge-green';
+  return 'badge-blue';
+};
+
+const eventTypeLabel = (type) => {
+  if (type === 'torneo') return 'Torneo';
+  if (type === 'torneo_ranking') return 'Torneo+Ranking';
+  return 'Liga';
+};
+
 const submitPlayer = () => playerForm.post(route('admin.players.store'), { onSuccess: () => playerForm.reset() });
 </script>
 

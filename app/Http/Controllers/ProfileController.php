@@ -152,10 +152,13 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
+        // Normalize email to lowercase before validation
+        $request->merge(['email' => strtolower(trim($request->input('email', '')))]);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'blader_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'phone' => ['required', 'string', 'max:20'],
             'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
         ]);

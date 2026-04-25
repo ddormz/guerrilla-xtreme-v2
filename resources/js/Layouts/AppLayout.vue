@@ -22,6 +22,9 @@
           <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/liga" class="nav-link" :class="{ active: $page.url.startsWith('/liga') }">
             <span class="nav-icon">🏆</span> Liga
           </Link>
+          <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/ranking" class="nav-link" :class="{ active: $page.url.startsWith('/ranking') }">
+            <span class="nav-icon">🏅</span> Ranking
+          </Link>
           <Link :href="route('tournaments.index')" class="nav-link" :class="{ active: $page.url.startsWith('/torneos') }">
             <span class="nav-icon">⚔️</span> Torneos
           </Link>
@@ -82,12 +85,13 @@
           <Link :href="route('home')" class="mobile-nav-link" @click="mobileMenuOpen = false">🏠 Inicio</Link>
           <Link href="/rifas" class="mobile-nav-link" @click="mobileMenuOpen = false">🎟️ Rifas</Link>
           <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/liga" class="mobile-nav-link" @click="mobileMenuOpen = false">🏆 Liga</Link>
+          <Link v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" href="/ranking" class="mobile-nav-link" @click="mobileMenuOpen = false">🏅 Ranking</Link>
           <Link href="/torneos" class="mobile-nav-link" @click="mobileMenuOpen = false">⚔️ Torneos</Link>
           <button class="mobile-nav-link theme-switch-item" @click="toggleTheme">
             <span>{{ isDark ? '☀️ Modo Claro' : '🌙 Modo Oscuro' }}</span>
           </button>
           
-          <template v-if="auth?.user?.role && ['miembro', 'arbitro_gx', 'admin'].includes(auth.user.role)">
+          <template v-if="auth?.user?.role && ['miembro', 'miembro_gx', 'arbitro_gx', 'admin'].includes(auth.user.role)">
             <div class="mobile-nav-divider"></div>
             <Link :href="route('profile.edit')" class="mobile-nav-link" @click="mobileMenuOpen = false">👤 Mi Perfil</Link>
             <Link href="/finanzas" class="mobile-nav-link" @click="mobileMenuOpen = false">💰 Finanzas</Link>
@@ -116,6 +120,7 @@
     <nav class="bottom-nav mobile-only">
       <BottomNavItem icon="🏠" label="Inicio" :href="route('home')" :active="$page.component === 'Home'" />
       <BottomNavItem v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" icon="🏆" label="Liga" href="/liga" :active="$page.url.startsWith('/liga')" />
+      <BottomNavItem v-if="auth?.user?.role === 'miembro_gx' || auth?.user?.role === 'admin'" icon="🏅" label="Ranking" href="/ranking" :active="$page.url.startsWith('/ranking')" />
       <BottomNavItem icon="⚔️" label="Torneos" href="/torneos" :active="$page.url.startsWith('/torneos')" />
       <BottomNavItem v-if="auth?.user && ['admin', 'arbitro_gx'].includes(auth.user.role)" icon="⚖️" label="Arbitrar" :href="route('referee.dashboard')" :active="$page.url.startsWith('/arbitrio')" />
       <BottomNavItem icon="🎟️" label="Rifas" href="/rifas" :active="$page.url.startsWith('/rifas')" />

@@ -128,7 +128,7 @@ class AdminLeagueController extends Controller
         $validated = $request->validate([
             'season_id' => 'required|exists:league_seasons,id',
             'name' => 'required|string|max:255',
-            'event_type' => ['required', 'string', Rule::in([EventType::Liga->value, EventType::Torneo->value])],
+            'event_type' => ['required', 'string', Rule::in([EventType::Liga->value, EventType::Torneo->value, EventType::TorneoRanking->value])],
             'event_date' => 'required|date',
             'description' => 'nullable|string',
             'rules' => 'nullable|string',
@@ -145,7 +145,7 @@ class AdminLeagueController extends Controller
             'show_on_index'     => 'boolean',
         ]);
 
-        $isLeagueEvent = ($validated['event_type'] ?? null) === EventType::Liga->value;
+        $isLeagueEvent = in_array($validated['event_type'] ?? null, [EventType::Liga->value, EventType::TorneoRanking->value]);
 
         if ($isLeagueEvent) {
             foreach (['description', 'rules', 'prizes', 'bank_name', 'account_type', 'account_holder', 'account_number', 'account_email', 'payment_instructions'] as $field) {
@@ -252,7 +252,7 @@ class AdminLeagueController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'event_type' => ['required', 'string', Rule::in([EventType::Liga->value, EventType::Torneo->value])],
+            'event_type' => ['required', 'string', Rule::in([EventType::Liga->value, EventType::Torneo->value, EventType::TorneoRanking->value])],
             'event_date' => 'required|date',
             'description' => 'nullable|string',
             'rules' => 'nullable|string',
@@ -269,7 +269,7 @@ class AdminLeagueController extends Controller
             'show_on_index'     => 'boolean',
         ]);
 
-        $isLeagueEvent = ($validated['event_type'] ?? null) === EventType::Liga->value;
+        $isLeagueEvent = in_array($validated['event_type'] ?? null, [EventType::Liga->value, EventType::TorneoRanking->value]);
 
         if ($isLeagueEvent) {
             foreach (['description', 'rules', 'prizes', 'bank_name', 'account_type', 'account_holder', 'account_number', 'account_email', 'payment_instructions'] as $field) {
@@ -525,7 +525,7 @@ class AdminLeagueController extends Controller
     public function updateAttendance(Request $request, LeagueEvent $event)
     {
         if ($event->event_type === EventType::Torneo) {
-            return back()->withErrors(['error' => 'Los torneos no gestionan asistencia ni pagos en esta plataforma.']);
+            return back()->withErrors(['error' => 'Los torneos clásicos no gestionan asistencia ni pagos en esta plataforma.']);
         }
 
         $validated = $request->validate([
@@ -554,7 +554,7 @@ class AdminLeagueController extends Controller
     public function generateMatches(Request $request, LeagueEvent $event)
     {
         if ($event->event_type === EventType::Torneo) {
-            return back()->withErrors(['error' => 'Los torneos no generan cruces en esta plataforma.']);
+            return back()->withErrors(['error' => 'Los torneos clásicos no generan cruces en esta plataforma.']);
         }
 
         $attendees = LeagueAttendance::where('event_id', $event->id)

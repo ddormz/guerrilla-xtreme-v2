@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EventType;
 use App\Models\LeagueMatch;
 use App\Models\MatchAction;
 use App\Enums\MatchActionType;
@@ -11,7 +12,8 @@ use Illuminate\Support\Facades\DB;
 class RefereeService
 {
     public function __construct(
-        protected LeagueService $leagueService
+        protected LeagueService $leagueService,
+        protected RankingService $rankingService,
     ) {}
 
     /**
@@ -122,7 +124,13 @@ class RefereeService
             $match->save();
 
             $match->load('event.season');
-            $this->leagueService->recalculateSeasonPoints($match->event->season);
+
+            // Recalculate based on event type
+            if ($match->event?->event_type === EventType::TorneoRanking) {
+                $this->rankingService->recalculateRanking();
+            } else {
+                $this->leagueService->recalculateSeasonPoints($match->event->season);
+            }
 
             broadcast(new MatchUpdated($match))->toOthers();
 
@@ -152,7 +160,13 @@ class RefereeService
             ]);
 
             $match->load('event.season');
-            $this->leagueService->recalculateSeasonPoints($match->event->season);
+
+            // Recalculate based on event type
+            if ($match->event?->event_type === EventType::TorneoRanking) {
+                $this->rankingService->recalculateRanking();
+            } else {
+                $this->leagueService->recalculateSeasonPoints($match->event->season);
+            }
 
             broadcast(new MatchUpdated($match))->toOthers();
 
@@ -167,7 +181,13 @@ class RefereeService
         $match->save();
 
         $match->load('event.season');
-        $this->leagueService->recalculateSeasonPoints($match->event->season);
+
+        // Recalculate based on event type
+        if ($match->event?->event_type === EventType::TorneoRanking) {
+            $this->rankingService->recalculateRanking();
+        } else {
+            $this->leagueService->recalculateSeasonPoints($match->event->season);
+        }
 
         broadcast(new MatchUpdated($match))->toOthers();
     }

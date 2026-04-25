@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
-Route::get('/dev/recalc', function () {
+Route::middleware(['auth', 'role:admin'])->get('/dev/recalc', function () {
     $results = [];
     foreach(\App\Models\LeagueSeason::all() as $season) {
         app(\App\Services\LeagueService::class)->recalculateSeasonPoints($season);
@@ -45,6 +45,7 @@ Route::get('/dev/recalc', function () {
 
 Route::get('liga', [LeagueController::class, 'standings'])->name('league.standings');
 Route::get('liga/jugadores/{player}', [LeagueController::class, 'playerProfile'])->name('league.players.show');
+Route::get('ranking', [LeagueController::class, 'ranking'])->name('ranking.index');
 Route::get('torneos', [LeagueController::class, 'events'])->name('tournaments.index');
 Route::get('torneos/{event}/registro', [LeagueController::class, 'registrationForm'])->name('tournaments.register');
 Route::post('torneos/{event}/registro/check', [LeagueController::class, 'checkRegistration'])->middleware('throttle:10,1')->name('tournaments.register.check');
@@ -139,7 +140,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::patch('jugadores/{player}/active', [AdminLeagueController::class, 'togglePlayerActive'])->name('admin.players.toggle-active');
 });
 
-Route::middleware(['auth', 'role:miembro,arbitro_gx,admin'])->group(function () {
+Route::middleware(['auth', 'role:miembro,miembro_gx,arbitro_gx,admin'])->group(function () {
     Route::get('/finanzas', [FinanceController::class, 'index'])->name('finance.index');
     Route::get('/perfil', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/perfil', [ProfileController::class, 'update'])->name('profile.update');

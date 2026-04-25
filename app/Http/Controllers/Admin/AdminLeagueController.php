@@ -49,8 +49,7 @@ class AdminLeagueController extends Controller
                 'location',
             ])
             ->orderBy('event_date', 'desc')
-            ->limit(20)
-            ->get();
+            ->paginate(15);
 
         $users = User::whereIn('role', [
             \App\Enums\UserRole::MiembroGx->value,

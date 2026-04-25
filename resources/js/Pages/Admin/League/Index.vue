@@ -4,7 +4,7 @@
 
     <div class="admin-league page-content">
       <nav class="mb-lg">
-        <Link :href="route('admin.dashboard')" class="btn btn-ghost btn-sm">← Dashboard</Link>
+        <Link href="/admin/ligas" class="btn btn-ghost btn-sm">← Admin</Link>
       </nav>
 
       <div class="page-header mb-xl">
@@ -52,7 +52,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="e in events" :key="e.id" class="table-row">
+                <tr v-for="e in events.data" :key="e.id" class="table-row">
                   <td>
                     <strong>{{ e.name }}</strong>
                     <span v-if="e.season?.name" class="text-xs text-muted block">{{ e.season.name }}</span>
@@ -71,6 +71,14 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination -->
+          <div v-if="events.links && events.last_page > 1" class="pagination-wrapper">
+            <template v-for="link in events.links" :key="link.label">
+              <Link v-if="link.url" :href="link.url" class="btn btn-sm" :class="link.active ? 'btn-primary' : 'btn-ghost'" v-html="link.label" preserve-scroll />
+              <span v-else class="btn btn-sm btn-ghost disabled" v-html="link.label" />
+            </template>
           </div>
         </section>
 
@@ -338,7 +346,7 @@ import ImageCropper from '@/Components/ImageCropper.vue';
 
 const props = defineProps({
   seasons: Array,
-  events: Array,
+  events: Object,
   users: Array,
   players: Array,
   pendingLeaguePayments: {
@@ -774,5 +782,19 @@ const submitPlayer = () => playerForm.post(route('admin.players.store'), { onSuc
   .roster-inline-form button {
     width: 100%;
   }
+}
+
+.pagination-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.pagination-wrapper .disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 </style>

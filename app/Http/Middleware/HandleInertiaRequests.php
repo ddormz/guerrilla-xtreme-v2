@@ -44,6 +44,7 @@ class HandleInertiaRequests extends Middleware
                 'troll_message' => fn () => $request->session()->get('troll_message'),
                 '_shadow_banned' => fn () => $request->session()->get('_shadow_banned'),
             ],
+            'modules' => fn () => \App\Models\SiteSetting::getModuleSettings(),
         ];
     }
 }

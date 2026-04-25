@@ -138,6 +138,10 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::post('jugadores/todos', [AdminLeagueController::class, 'addAllGxMembers'])->name('admin.players.addAll');
     Route::delete('jugadores/{player}', [AdminLeagueController::class, 'destroyPlayer'])->name('admin.players.destroy');
     Route::patch('jugadores/{player}/active', [AdminLeagueController::class, 'togglePlayerActive'])->name('admin.players.toggle-active');
+
+    // Site Settings (module visibility)
+    Route::get('configuracion', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'index'])->name('admin.settings.index');
+    Route::post('configuracion/modulos', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'updateModules'])->name('admin.settings.modules.update');
 });
 
 Route::middleware(['auth', 'role:miembro,miembro_gx,arbitro_gx,admin'])->group(function () {

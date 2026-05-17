@@ -3,10 +3,10 @@
 namespace App\Services;
 
 use App\Enums\EventType;
-use App\Models\LeagueMatch;
-use App\Models\MatchAction;
 use App\Enums\MatchActionType;
 use App\Events\MatchUpdated;
+use App\Models\LeagueMatch;
+use App\Models\MatchAction;
 use Illuminate\Support\Facades\DB;
 
 class RefereeService
@@ -37,7 +37,7 @@ class RefereeService
 
             // 2. Update match scores/stats
             $points = $type->points();
-            $scoreField = 'score_' . $side;
+            $scoreField = 'score_'.$side;
             $match->$scoreField += $points;
 
             // GX Rule: If points are scored, reset strikes for BOTH sides
@@ -47,20 +47,20 @@ class RefereeService
             }
 
             // Update specific finish type count
-            $statField = strtolower($type->value) . '_' . $side;
+            $statField = strtolower($type->value).'_'.$side;
             if (in_array($type, [MatchActionType::Xtreme, MatchActionType::Spin, MatchActionType::Over, MatchActionType::Burst])) {
                 $match->$statField += 1;
             }
 
             // 3. Handle Special actions
             if ($type === MatchActionType::Strike) {
-                $strikeField = 'strikes_' . $side;
+                $strikeField = 'strikes_'.$side;
                 $match->$strikeField += 1;
-                
+
                 // GX Rule: Consecutive 2 strikes = 1 point to the rival
                 if ($match->$strikeField >= 2) {
                     $otherSide = $side === 'a' ? 'b' : 'a';
-                    $otherScoreField = 'score_' . $otherSide;
+                    $otherScoreField = 'score_'.$otherSide;
                     $match->$otherScoreField += 1;
                     $match->$strikeField = 0; // Reset after it becomes a point
                 }
@@ -91,28 +91,30 @@ class RefereeService
                 ->orderBy('created_at', 'desc')
                 ->first();
 
-            if (!$lastAction) return $match;
+            if (! $lastAction) {
+                return $match;
+            }
 
             $side = $lastAction->side;
             $type = $lastAction->action_type;
 
             // Deduct score
-            $scoreField = 'score_' . $side;
+            $scoreField = 'score_'.$side;
             $match->$scoreField -= $type->points();
 
             // Deduct stat
-            $statField = strtolower($type->value) . '_' . $side;
+            $statField = strtolower($type->value).'_'.$side;
             if (in_array($type, [MatchActionType::Xtreme, MatchActionType::Spin, MatchActionType::Over, MatchActionType::Burst])) {
                 $match->$statField = max(0, $match->$statField - 1);
             }
 
             if ($type === MatchActionType::Strike) {
-                $strikeField = 'strikes_' . $side;
-                
+                $strikeField = 'strikes_'.$side;
+
                 // If we are undoing the strike that gave a point to the rival
                 if ($match->$strikeField % 2 === 0) {
                     $otherSide = $side === 'a' ? 'b' : 'a';
-                    $otherScoreField = 'score_' . $otherSide;
+                    $otherScoreField = 'score_'.$otherSide;
                     $match->$otherScoreField -= 1;
                 }
 
@@ -123,14 +125,7 @@ class RefereeService
             $match->concluded = false; // Re-open if it was closed
             $match->save();
 
-            $match->load('event.season');
-
-            // Recalculate based on event type
-            if ($match->event?->event_type === EventType::TorneoRanking) {
-                $this->rankingService->recalculateRanking();
-            } else {
-                $this->leagueService->recalculateSeasonPoints($match->event->season);
-            }
+            $this->refreshStandingsForMatch($match);
 
             broadcast(new MatchUpdated($match))->toOthers();
 
@@ -159,14 +154,7 @@ class RefereeService
                 'winner_id' => null,
             ]);
 
-            $match->load('event.season');
-
-            // Recalculate based on event type
-            if ($match->event?->event_type === EventType::TorneoRanking) {
-                $this->rankingService->recalculateRanking();
-            } else {
-                $this->leagueService->recalculateSeasonPoints($match->event->season);
-            }
+            $this->refreshStandingsForMatch($match);
 
             broadcast(new MatchUpdated($match))->toOthers();
 
@@ -180,15 +168,19 @@ class RefereeService
         $match->winner_id = $match->score_a > $match->score_b ? $match->player_a_id : $match->player_b_id;
         $match->save();
 
-        $match->load('event.season');
-
-        // Recalculate based on event type
-        if ($match->event?->event_type === EventType::TorneoRanking) {
-            $this->rankingService->recalculateRanking();
-        } else {
-            $this->leagueService->recalculateSeasonPoints($match->event->season);
-        }
+        $this->refreshStandingsForMatch($match);
 
         broadcast(new MatchUpdated($match))->toOthers();
+    }
+
+    public function refreshStandingsForMatch(LeagueMatch $match): void
+    {
+        $match->loadMissing('event.season');
+
+        match ($match->event?->event_type) {
+            EventType::Liga => $this->leagueService->recalculateSeasonPoints($match->event->season),
+            EventType::TorneoRanking => $this->rankingService->recalculateRanking(),
+            default => null,
+        };
     }
 }

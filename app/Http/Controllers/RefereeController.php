@@ -6,7 +6,6 @@ use App\Enums\MatchActionType;
 use App\Models\LeagueMatch;
 use App\Models\MatchAction;
 use App\Services\RefereeService;
-use App\Services\LeagueService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -14,7 +13,6 @@ class RefereeController extends Controller
 {
     public function __construct(
         protected RefereeService $refereeService,
-        protected LeagueService $leagueService
     ) {}
 
     public function dashboard(Request $request)
@@ -106,7 +104,7 @@ class RefereeController extends Controller
         return Inertia::render('Referee/Panel', [
             'matchData' => $match,
             'actionsList' => $actionsData,
-            'canArbitrate' => (auth()->id() === $match->referee_user_id || auth()->user()->role === 'admin')
+            'canArbitrate' => (auth()->id() === $match->referee_user_id || auth()->user()->role === 'admin'),
         ]);
     }
 
@@ -114,7 +112,7 @@ class RefereeController extends Controller
     {
         $validated = $request->validate([
             'side' => 'required|in:a,b',
-            'action_type' => 'required|in:spin,over,burst,xtreme,strike'
+            'action_type' => 'required|in:spin,over,burst,xtreme,strike',
         ]);
 
         try {
@@ -210,8 +208,7 @@ class RefereeController extends Controller
             'concluded_at' => now(),
         ]);
 
-        $match->load('event.season');
-        $this->leagueService->recalculateSeasonPoints($match->event->season);
+        $this->refereeService->refreshStandingsForMatch($match);
 
         $winnerName = $validated['winner_id'] == $match->player_a_id
             ? ($match->playerA?->blader_name ?: $match->playerA?->real_name ?: 'Jugador A')
@@ -241,7 +238,7 @@ class RefereeController extends Controller
 
         return redirect()
             ->route('referee.dashboard', ['filter' => 'assigned'])
-            ->with('success', 'Match finalizado. Ganador: ' . $winnerName . '.');
+            ->with('success', 'Match finalizado. Ganador: '.$winnerName.'.');
     }
 
     public function show(LeagueMatch $match)
@@ -251,7 +248,7 @@ class RefereeController extends Controller
 
         return Inertia::render('Referee/Show', [
             'match' => $match,
-            'actions' => $actionsData
+            'actions' => $actionsData,
         ]);
     }
 

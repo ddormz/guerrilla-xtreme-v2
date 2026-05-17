@@ -176,9 +176,14 @@ class RefereeService
     public function refreshStandingsForMatch(LeagueMatch $match): void
     {
         $match->loadMissing('event.season');
+        $event = $match->event;
 
-        match ($match->event?->event_type) {
-            EventType::Liga => $this->leagueService->recalculateSeasonPoints($match->event->season),
+        if (! $event) {
+            return;
+        }
+
+        match ($event->event_type) {
+            EventType::Liga => $this->leagueService->recalculateSeasonPoints($event->season),
             EventType::TorneoRanking => $this->rankingService->recalculateRanking(),
             default => null,
         };

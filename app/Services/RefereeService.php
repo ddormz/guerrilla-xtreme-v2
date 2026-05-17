@@ -182,10 +182,8 @@ class RefereeService
             return;
         }
 
-        if ($event->event_type === EventType::Liga) {
-            if ($event->season) {
-                $this->leagueService->recalculateSeasonPoints($event->season);
-            }
+        if ($event->event_type === EventType::Liga && $event->season) {
+            $this->leagueService->recalculateSeasonPoints($event->season);
 
             return;
         }

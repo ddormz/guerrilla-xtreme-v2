@@ -131,6 +131,8 @@ class LeagueRecalculationTest extends TestCase
 
         app(RefereeService::class)->finalizeMatch($match);
 
+        $freshMatch = $match->fresh();
+
         $this->assertDatabaseHas('league_points', [
             'season_id' => $season->id,
             'player_id' => $playerA->id,
@@ -143,8 +145,8 @@ class LeagueRecalculationTest extends TestCase
             'bursts' => 1,
         ]);
 
-        $this->assertTrue($match->fresh()->concluded);
-        $this->assertSame($playerA->id, $match->fresh()->winner_id);
+        $this->assertTrue($freshMatch->concluded);
+        $this->assertSame($playerA->id, $freshMatch->winner_id);
     }
 
     /**

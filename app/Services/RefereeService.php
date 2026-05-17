@@ -182,8 +182,15 @@ class RefereeService
             return;
         }
 
+        if ($event->event_type === EventType::Liga) {
+            if ($event->season) {
+                $this->leagueService->recalculateSeasonPoints($event->season);
+            }
+
+            return;
+        }
+
         match ($event->event_type) {
-            EventType::Liga => $this->leagueService->recalculateSeasonPoints($event->season),
             EventType::TorneoRanking => $this->rankingService->recalculateRanking(),
             default => null,
         };

@@ -188,9 +188,8 @@ class RefereeService
             return;
         }
 
-        match ($event->event_type) {
-            EventType::TorneoRanking => $this->rankingService->recalculateRanking(),
-            default => null,
-        };
+        if ($event->event_type === EventType::TorneoRanking) {
+            $this->rankingService->recalculateRanking();
+        }
     }
 }

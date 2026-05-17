@@ -6,9 +6,11 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected static ?string $appKey = null;
+
     protected function setUp(): void
     {
-        $appKey = 'base64:'.base64_encode(random_bytes(32));
+        $appKey = self::$appKey ??= 'base64:'.base64_encode(random_bytes(32));
         $envFile = dirname(__DIR__).'/.env';
         $envExampleFile = dirname(__DIR__).'/.env.example';
         $databaseFile = dirname(__DIR__).'/database/database.sqlite';

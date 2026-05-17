@@ -2,11 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\LeagueSeason;
-use App\Models\LeaguePlayer;
-use App\Models\LeaguePoints;
+use App\Enums\EventType;
 use App\Models\LeagueMatch;
-use App\Enums\SeasonStatus;
+use App\Models\LeaguePoints;
+use App\Models\LeagueSeason;
 use Illuminate\Support\Facades\DB;
 
 class LeagueService
@@ -34,13 +33,18 @@ class LeagueService
             // Reset all points for this season
             LeaguePoints::where('season_id', $season->id)->update([
                 'points' => 0, 'wins' => 0, 'losses' => 0,
-                'xtremes' => 0, 'spins' => 0, 'overs' => 0, 'bursts' => 0
+                'xtremes' => 0, 'spins' => 0, 'overs' => 0, 'bursts' => 0,
             ]);
 
-            // Get all concluded matches
-            $matches = LeagueMatch::whereIn('event_id', function($query) use ($season) {
-                $query->select('id')->from('league_events')->where('season_id', $season->id);
-            })->where('concluded', true)->get();
+            // Get all concluded league matches for this season
+            $matches = LeagueMatch::query()
+                ->where('concluded', true)
+                ->whereHas('event', function ($query) use ($season) {
+                    $query
+                        ->where('season_id', $season->id)
+                        ->where('event_type', EventType::Liga->value);
+                })
+                ->get();
 
             foreach ($matches as $match) {
                 $this->applyMatchResult($season->id, $match);
@@ -56,7 +60,9 @@ class LeagueService
      */
     private function applyMatchResult(int $seasonId, LeagueMatch $match): void
     {
-        if (!$match->player_a_id || !$match->player_b_id) return;
+        if (! $match->player_a_id || ! $match->player_b_id) {
+            return;
+        }
 
         // Player A gets their actual match score as league points
         $this->updatePlayerStats($seasonId, $match->player_a_id, [
